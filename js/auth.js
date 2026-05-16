@@ -51,7 +51,7 @@ const Auth = (() => {
   async function register(email, password) {
     const { data, error } = await db.auth.signUp({
       email, password,
-      options: { emailRedirectTo: window.location.origin },
+      options: { emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]*$/, '') },
     });
     if (error) throw error;
     return { needsConfirmation: !data.session };
