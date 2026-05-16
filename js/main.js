@@ -4,10 +4,27 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
 
+  // ── Утилиты ─────────────────────────────────────────────────────────
+  function _escHtml(str) {
+    return String(str || '').replace(/[&<>"']/g, c =>
+      ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  }
+
+  function _initReveal() {
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
+      });
+    }, { threshold: 0.08 });
+    document.querySelectorAll('.reveal:not(.visible)').forEach(el => obs.observe(el));
+  }
+  window._initReveal = _initReveal;
+
   // ── Инициализация ───────────────────────────────────────────────────
   await Auth.init();
   await Platforms.loadAndRender();
   await Apps.loadAndRender();
+  _initReveal();
 
   // ── Вкладки ─────────────────────────────────────────────────────────
   document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -17,14 +34,91 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById(`tab-${target}`)?.classList.add('active');
+      // Re-run reveal так как вкладка могла быть скрыта через display:none
+      requestAnimationFrame(_initReveal);
     });
   });
+
+  // ── Настройки ───────────────────────────────────────────────────────
+  function _renderSettings(user) {
+    const container = document.getElementById('settings-content');
+    if (!container) return;
+
+    if (!user) {
+      container.innerHTML = `
+        <div class="settings-locked reveal">
+          <div class="settings-lock-icon">🔒</div>
+          <h3>Войдите в аккаунт</h3>
+          <p>Для доступа к настройкам необходима авторизация.</p>
+          <button class="btn-primary" style="margin-top:8px"
+                  onclick="document.getElementById('btn-login').click()">Войти / Зарегистрироваться</button>
+        </div>`;
+    } else {
+      const since = new Date(user.created_at).toLocaleDateString('ru-RU',
+        { year: 'numeric', month: 'long', day: 'numeric' });
+      container.innerHTML = `
+        <div class="settings-grid">
+          <div class="settings-card reveal">
+            <div class="settings-card-header">
+              <span class="settings-icon">👤</span><h3>Профиль</h3>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Email</span>
+              <span class="settings-value">${_escHtml(user.email)}</span>
+            </div>
+            <div class="settings-item">
+              <span class="settings-label">Аккаунт создан</span>
+              <span class="settings-value">${since}</span>
+            </div>
+          </div>
+          <div class="settings-card reveal" style="transition-delay:.08s">
+            <div class="settings-card-header">
+              <span class="settings-icon">🔐</span><h3>Безопасность</h3>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <span class="settings-label">Пароль</span>
+                <div class="settings-sub">Изменить пароль от аккаунта</div>
+              </div>
+              <button class="btn-outline sm" id="btn-change-pwd">Изменить</button>
+            </div>
+          </div>
+          <div class="settings-card danger-card reveal" style="transition-delay:.16s">
+            <div class="settings-card-header">
+              <span class="settings-icon">🚪</span><h3>Выход</h3>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-info">
+                <span class="settings-label">Завершить сессию</span>
+                <div class="settings-sub">Выйти из аккаунта на этом устройстве</div>
+              </div>
+              <button class="btn-danger sm" id="btn-settings-logout">Выйти</button>
+            </div>
+          </div>
+        </div>`;
+
+      document.getElementById('btn-change-pwd')?.addEventListener('click', () => {
+        const m = document.getElementById('pwd-modal');
+        document.getElementById('pwd-error').textContent = '';
+        document.getElementById('pwd-new').value = '';
+        document.getElementById('pwd-confirm').value = '';
+        m?.classList.remove('hidden');
+      });
+      document.getElementById('btn-settings-logout')?.addEventListener('click', async () => {
+        await Auth.signOut();
+      });
+    }
+    _initReveal();
+  }
 
   // ── Реакция на авторизацию ──────────────────────────────────────────
   Auth.onChange((user, isAdmin) => {
     _updateNavbar(user, isAdmin);
+    Apps.rerender();
+    _renderSettings(user);
   });
   _updateNavbar(Auth.currentUser(), Auth.isAdmin());
+  _renderSettings(Auth.currentUser());
 
   // ── Модальное окно авторизации ──────────────────────────────────────
   const modal    = document.getElementById('auth-modal');
@@ -122,6 +216,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {
       otpErr.textContent = _mapError(e.message);
     }
+  });
+
+  // ── Смена пароля ─────────────────────────────────────────────────────
+  const pwdModal = document.getElementById('pwd-modal');
+  document.getElementById('pwd-close')?.addEventListener('click', () => pwdModal.classList.add('hidden'));
+  pwdModal?.addEventListener('click', e => { if (e.target === pwdModal) pwdModal.classList.add('hidden'); });
+  document.getElementById('pwd-submit')?.addEventListener('click', async () => {
+    const newPwd  = document.getElementById('pwd-new').value;
+    const confirm = document.getElementById('pwd-confirm').value;
+    const err     = document.getElementById('pwd-error');
+    err.textContent = '';
+    if (!newPwd || newPwd.length < 6) { err.textContent = 'Минимум 6 символов.'; return; }
+    if (newPwd !== confirm)            { err.textContent = 'Пароли не совпадают.'; return; }
+    try {
+      await Auth.updatePassword(newPwd);
+      pwdModal.classList.add('hidden');
+      _showInfo('Пароль успешно изменён.');
+    } catch (e) { err.textContent = e.message; }
   });
 
   // ── Лайтбокс (скриншоты) ────────────────────────────────────────────

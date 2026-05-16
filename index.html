@@ -25,8 +25,8 @@
 
 <!-- ── Hero ────────────────────────────────────────────────────────── -->
 <section class="hero">
-  <h1>Автоматизация поиска работы</h1>
-  <p>Умные инструменты, которые откликаются на вакансии за вас — пока вы занимаетесь другим.</p>
+  <h1 class="reveal">Автоматизация поиска работы</h1>
+  <p class="reveal" style="transition-delay:.12s">Умные инструменты, которые откликаются на вакансии за вас — пока вы занимаетесь другим.</p>
 </section>
 
 <!-- ── Вкладки ─────────────────────────────────────────────────────── -->
@@ -34,6 +34,8 @@
   <nav class="tabs-nav">
     <button class="tab-btn active" data-tab="platforms">Площадки</button>
     <button class="tab-btn" data-tab="apps">Приложения</button>
+    <button class="tab-btn" data-tab="pricing">Тарифы</button>
+    <button class="tab-btn" data-tab="settings">Настройки</button>
   </nav>
 
   <div id="tab-platforms" class="tab-panel active">
@@ -43,11 +45,64 @@
   <div id="tab-apps" class="tab-panel">
     <div id="apps-content"><div class="spinner"></div></div>
   </div>
+
+  <div id="tab-pricing" class="tab-panel">
+    <div class="pricing-header reveal">
+      <h2>Тарифы и цены</h2>
+      <p>Автоматизируйте отклики на hh.ru — выберите подходящий план</p>
+    </div>
+    <div class="pricing-grid">
+      <div class="pricing-card reveal" style="transition-delay:.05s">
+        <div class="pricing-badge">Пробный</div>
+        <div class="pricing-price pricing-free">3 дня</div>
+        <div class="pricing-period">бесплатно</div>
+        <ul class="pricing-features">
+          <li><span class="pf-icon">✓</span> До 30 откликов в день</li>
+          <li><span class="pf-icon">✓</span> Базовые фильтры вакансий</li>
+          <li><span class="pf-icon">✓</span> Сопроводительное письмо</li>
+          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Расширенные фильтры</span></li>
+          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Приоритетная поддержка</span></li>
+        </ul>
+        <a class="btn-outline pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Попробовать</a>
+      </div>
+      <div class="pricing-card featured reveal" style="transition-delay:.12s">
+        <div class="pricing-badge popular">★ Популярный</div>
+        <div class="pricing-price">299<span>₽</span></div>
+        <div class="pricing-period">в месяц · 2 490 ₽/год</div>
+        <ul class="pricing-features">
+          <li><span class="pf-icon">✓</span> Неограниченные отклики</li>
+          <li><span class="pf-icon">✓</span> Расширенные фильтры</li>
+          <li><span class="pf-icon">✓</span> Сопроводительное письмо</li>
+          <li><span class="pf-icon">✓</span> Автообновление приложения</li>
+          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Несколько аккаунтов</span></li>
+        </ul>
+        <a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a>
+      </div>
+      <div class="pricing-card reveal" style="transition-delay:.19s">
+        <div class="pricing-badge">Максимум</div>
+        <div class="pricing-price">499<span>₽</span></div>
+        <div class="pricing-period">в месяц · 3 990 ₽/год</div>
+        <ul class="pricing-features">
+          <li><span class="pf-icon">✓</span> Всё из Стандарта</li>
+          <li><span class="pf-icon">✓</span> До 3 аккаунтов hh.ru</li>
+          <li><span class="pf-icon">✓</span> Персональная настройка</li>
+          <li><span class="pf-icon">✓</span> Поддержка 24/7</li>
+          <li><span class="pf-icon">✓</span> Ранний доступ к функциям</li>
+        </ul>
+        <a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a>
+      </div>
+    </div>
+    <p class="pricing-note">Оплата и управление подпиской — через <a href="https://t.me/VacantrixB_O_T" target="_blank">Telegram-бот</a></p>
+  </div>
+
+  <div id="tab-settings" class="tab-panel">
+    <div id="settings-content"></div>
+  </div>
 </div>
 
 <!-- ── Footer ──────────────────────────────────────────────────────── -->
 <footer>
-  <p>© 2025 Vacantrix. Все права защищены.</p>
+  <p>© 2026 Vacantrix. Все права защищены.</p>
 </footer>
 
 <!-- ════════════════════════════════════════════════════════════════════
@@ -97,6 +152,24 @@
     <button id="otp-submit" class="btn-primary" style="width:100%;justify-content:center;padding:12px">
       Подтвердить
     </button>
+  </div>
+</div>
+
+<!-- Смена пароля -->
+<div id="pwd-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <button id="pwd-close" class="modal-close" aria-label="Закрыть">✕</button>
+    <h2>Изменить пароль</h2>
+    <div class="form-group">
+      <label for="pwd-new">Новый пароль</label>
+      <input id="pwd-new" type="password" class="form-input" placeholder="Минимум 6 символов" autocomplete="new-password">
+    </div>
+    <div class="form-group">
+      <label for="pwd-confirm">Повторите пароль</label>
+      <input id="pwd-confirm" type="password" class="form-input" placeholder="Повторите новый пароль" autocomplete="new-password">
+    </div>
+    <p id="pwd-error" class="form-error"></p>
+    <button id="pwd-submit" class="btn-primary" style="width:100%;justify-content:center;padding:12px">Сохранить</button>
   </div>
 </div>
 

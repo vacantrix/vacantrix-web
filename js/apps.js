@@ -4,6 +4,8 @@
 
 const Apps = (() => {
 
+  let _cachedApps = [];
+
   async function load() {
     const { data, error } = await db
       .from('web_apps')
@@ -42,7 +44,7 @@ const Apps = (() => {
     const screenshots = Array.isArray(app.screenshots) ? app.screenshots : [];
 
     const el = document.createElement('div');
-    el.className = 'app-full';
+    el.className = 'app-full reveal';
     el.innerHTML = `
       <div class="app-full-hero">
         <div class="app-full-left">
@@ -57,7 +59,9 @@ const Apps = (() => {
         </div>
         <div class="app-cta-row">
           ${app.download_url
-            ? `<a class="btn-primary" href="${_esc(app.download_url)}" target="_blank">⬇ Скачать</a>`
+            ? Auth.isLoggedIn()
+              ? `<a class="btn-primary" href="${_esc(app.download_url)}" target="_blank">⬇ Скачать</a>`
+              : `<button class="btn-primary" onclick="document.getElementById('btn-login').click()">⬇ Скачать</button>`
             : ''}
           ${app.appstore_url
             ? `<a class="btn-store" href="${_esc(app.appstore_url)}" target="_blank">🍎 App Store</a>`
@@ -120,7 +124,9 @@ const Apps = (() => {
       <p class="app-card-tagline">${_esc(app.tagline)}</p>
       <div class="app-card-btns">
         ${app.download_url
-          ? `<a class="btn-primary sm" href="${_esc(app.download_url)}" target="_blank">⬇ Скачать</a>`
+          ? Auth.isLoggedIn()
+            ? `<a class="btn-primary sm" href="${_esc(app.download_url)}" target="_blank">⬇ Скачать</a>`
+            : `<button class="btn-primary sm" onclick="document.getElementById('btn-login').click()">⬇ Скачать</button>`
           : ''}
         ${app.website_url
           ? `<a class="btn-outline sm" href="${_esc(app.website_url)}" target="_blank">Подробнее</a>`
@@ -187,9 +193,14 @@ const Apps = (() => {
   async function loadAndRender() {
     const container = document.getElementById('apps-content');
     if (container) container.innerHTML = '<div class="spinner"></div>';
-    const data = await load();
-    render(data);
+    _cachedApps = await load();
+    render(_cachedApps);
   }
 
-  return { loadAndRender, openLightbox, lbPrev, lbNext, lbClose, scrollTo };
+  function rerender() {
+    render(_cachedApps);
+    if (window._initReveal) window._initReveal();
+  }
+
+  return { loadAndRender, rerender, openLightbox, lbPrev, lbNext, lbClose, scrollTo };
 })();
