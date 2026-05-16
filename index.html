@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vacantrix</title>
+  <meta name="description" content="Умные инструменты для поиска работы. Автоотклик на hh.ru — быстро, безопасно, автоматически.">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────────────── -->
+<nav class="navbar">
+  <span class="navbar-brand">Vacantrix</span>
+  <div class="navbar-actions">
+    <span id="user-info" class="hidden"></span>
+    <a id="btn-admin" class="btn-ghost hidden" href="admin.html">Панель</a>
+    <button id="btn-login" class="btn-primary">Войти</button>
+    <button id="btn-logout" class="btn-outline hidden">Выйти</button>
+  </div>
+</nav>
+
+<!-- ── Информационный баннер ────────────────────────────────────────── -->
+<div id="global-info" class="hidden"></div>
+
+<!-- ── Hero ────────────────────────────────────────────────────────── -->
+<section class="hero">
+  <h1>Автоматизация поиска работы</h1>
+  <p>Умные инструменты, которые откликаются на вакансии за вас — пока вы занимаетесь другим.</p>
+</section>
+
+<!-- ── Вкладки ─────────────────────────────────────────────────────── -->
+<div class="main-content">
+  <nav class="tabs-nav">
+    <button class="tab-btn active" data-tab="platforms">Площадки</button>
+    <button class="tab-btn" data-tab="apps">Приложения</button>
+  </nav>
+
+  <div id="tab-platforms" class="tab-panel active">
+    <div id="platforms-content"><div class="spinner"></div></div>
+  </div>
+
+  <div id="tab-apps" class="tab-panel">
+    <div id="apps-content"><div class="spinner"></div></div>
+  </div>
+</div>
+
+<!-- ── Footer ──────────────────────────────────────────────────────── -->
+<footer>
+  <p>© 2025 Vacantrix. Все права защищены.</p>
+</footer>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     Модальные окна
+════════════════════════════════════════════════════════════════════ -->
+
+<!-- Авторизация -->
+<div id="auth-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <button id="modal-close" class="modal-close" aria-label="Закрыть">✕</button>
+    <h2 id="auth-title">Вход</h2>
+    <form id="auth-form" onsubmit="return false">
+      <div class="form-group">
+        <label for="auth-email">Email</label>
+        <input id="auth-email" type="email" class="form-input" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+      <div class="form-group">
+        <label for="auth-password">Пароль</label>
+        <input id="auth-password" type="password" class="form-input" placeholder="Минимум 6 символов" autocomplete="current-password" required>
+      </div>
+      <div id="remember-row" class="form-check">
+        <input type="checkbox" id="auth-remember">
+        <label for="auth-remember">Запомнить меня на этом устройстве</label>
+      </div>
+      <p id="auth-error" class="form-error"></p>
+      <div class="form-actions">
+        <button id="auth-submit" type="button" class="btn-primary" data-mode="login">Войти</button>
+        <span id="switch-mode" class="form-switch">Нет аккаунта? Зарегистрироваться</span>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- OTP-подтверждение -->
+<div id="otp-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <button id="otp-close" class="modal-close" aria-label="Закрыть">✕</button>
+    <h2>Подтверждение входа</h2>
+    <p id="otp-hint" style="color:var(--text2);font-size:14px;margin-bottom:20px;"></p>
+    <div class="form-group">
+      <label for="otp-input">Код из письма</label>
+      <input id="otp-input" type="text" class="form-input"
+             placeholder="6-значный код" maxlength="6"
+             inputmode="numeric" autocomplete="one-time-code">
+    </div>
+    <p id="otp-error" class="form-error"></p>
+    <button id="otp-submit" class="btn-primary" style="width:100%;justify-content:center;padding:12px">
+      Подтвердить
+    </button>
+  </div>
+</div>
+
+<!-- Лайтбокс скриншотов -->
+<div id="lightbox" class="hidden">
+  <img id="lb-img" src="" alt="Скриншот">
+  <div class="lb-controls">
+    <button class="lb-btn" id="lb-prev" aria-label="Назад">‹</button>
+    <span id="lb-counter"></span>
+    <button class="lb-btn" id="lb-next" aria-label="Вперёд">›</button>
+  </div>
+  <button class="lb-btn" id="lb-close" aria-label="Закрыть" style="margin-top:4px">✕</button>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════
+     Скрипты
+════════════════════════════════════════════════════════════════════ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/platforms.js"></script>
+<script src="js/apps.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
