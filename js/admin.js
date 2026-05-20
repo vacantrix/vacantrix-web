@@ -8,7 +8,7 @@ const Admin = (() => {
   async function init() {
     await Auth.init();
     if (!Auth.isLoggedIn()) {
-      window.location.href = '../index.html';
+      window.location.href = 'index.html';
       return;
     }
     if (!Auth.isAdmin()) {
@@ -33,7 +33,7 @@ const Admin = (() => {
 
     document.getElementById('btn-admin-logout')?.addEventListener('click', async () => {
       await Auth.signOut();
-      window.location.href = '../index.html';
+      window.location.href = 'index.html';
     });
   }
 
