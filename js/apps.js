@@ -46,7 +46,7 @@ const Apps = (() => {
     const dlBtn = app.download_url
       ? Auth.isLoggedIn()
         ? `<button class="btn-download" onclick="Apps.startDownload('${_esc(app.download_url)}')">
-             <span class="dl-icon">⊞</span>
+             <span class="dl-icon">🖥</span>
              <div class="dl-text">
                <span class="dl-title">Скачать для Windows</span>
                <span class="dl-sub">Бесплатно · Без установки</span>
@@ -54,7 +54,7 @@ const Apps = (() => {
              <span class="dl-arrow">↓</span>
            </button>`
         : `<button class="btn-download btn-download-lock" onclick="document.getElementById('btn-login').click()">
-             <span class="dl-icon">⊞</span>
+             <span class="dl-icon">🖥</span>
              <div class="dl-text">
                <span class="dl-title">Скачать для Windows</span>
                <span class="dl-sub">Войдите, чтобы скачать</span>
