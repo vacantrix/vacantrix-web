@@ -6,16 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```
 vacantrix-web/
-├── index.html          ← Главная страница (каталог, авторизация, настройки)
-├── admin.html          ← Панель администратора
-├── schema.sql          ← SQL-схема таблиц Supabase
+├── index.html                  ← Главная страница (каталог, авторизация, настройки)
+├── admin.html                  ← Панель администратора
+├── schema.sql                  ← SQL-схема таблиц Supabase
+├── vx_profiles_migration.sql   ← Миграция таблицы vx_profiles (уже применена)
 ├── css/
-│   └── main.css        (все стили)
+│   └── main.css                (все стили, включая .coming-soon)
 ├── js/
 │   ├── config.js       (SUPABASE_URL, SUPABASE_ANON — точка конфигурации)
 │   ├── auth.js         (Auth — email/password + OTP авторизация)
-│   ├── platforms.js    (Platforms — вкладка площадок/ссылок)
-│   ├── apps.js         (Apps — вкладка приложений, лайтбокс)
+│   ├── profile.js      (Profile — загрузка vx_profiles, displayName, subscriptionText)
+│   ├── platforms.js    (Platforms — вкладка «Наши площадки», сейчас статический «Скоро»)
+│   ├── apps.js         (Apps — вкладка приложений, лайтбокс, скачивание)
 │   ├── main.js         (оркестратор главной страницы)
 │   └── admin.js        (AdminPanel — управление контентом)
 └── img/                (иконки, скриншоты приложений)
@@ -57,7 +59,9 @@ const SUPABASE_ANON = '...';  // anon/publishable ключ
 Порядок загрузки страницы:
 1. Синхронно регистрируются все обработчики кнопок и модальных окон
 2. Асинхронно (не блокируя UI) инициализируется `Auth.init()` с таймаутом 5 сек
-3. Параллельно грузятся `Platforms.loadAndRender()` и `Apps.loadAndRender()`
+3. `Profile.load(userId)` подтягивает `vx_profiles` после авторизации
+4. `Platforms.loadAndRender()` — **синхронная** функция, рисует статический «Скоро»
+5. `Apps.loadAndRender()` — загружает карточки приложений из `web_apps`
 
 ### Авторизация (`auth.js`)
 
@@ -76,27 +80,60 @@ const SUPABASE_ANON = '...';  // anon/publishable ключ
 
 Роли хранятся в таблице `web_user_roles`. Первый зарегистрировавшийся автоматически получает роль `admin`.
 
+### Профиль (`profile.js`)
+
+`Profile` — глобальный объект:
+
+| Метод | Описание |
+|-------|----------|
+| `Profile.load(userId)` | Загружает запись из `vx_profiles` по `web_user_id` |
+| `Profile.current()` | Текущий профиль (объект из vx_profiles) |
+| `Profile.displayName()` | Возвращает `display_name` или `null` |
+| `Profile.subscriptionText()` | Текст и флаг активности подписки |
+| `Profile.linkHH(hhId, userId)` | Привязывает `hh_applicant_id` к профилю |
+| `Profile.linkAvito(avitoId, userId)` | Привязывает `avito_user_id` к профилю |
+| `Profile.unlink()` | Сбрасывает привязки приложений |
+
+### Вкладка «Площадки» (`platforms.js`)
+
+Статический блок — **не читает БД**. Показывает заглушку «Скоро».
+Будет наполнена ссылками на соцсети и каналы Vacantrix (Telegram, VK и др.).
+
+### Вкладка «Приложения» (`apps.js`)
+
+Читает `web_apps` из Supabase. Кнопка скачивания требует авторизации (`Auth.isLoggedIn()`).
+
 ### Supabase (таблицы сайта)
 
 | Таблица | Назначение |
 |---------|-----------|
-| `web_platforms` | Площадки/ссылки с категориями (HH, Avito и др.) |
-| `web_apps` | Карточки приложений (name, slug, version, download_url, screenshots) |
+| `web_platforms` | Наши каналы/сообщества (Telegram, VK и др.) — пока пустая |
+| `web_apps` | Карточки приложений (name, download_url, screenshots и др.) |
 | `web_user_roles` | Роли пользователей (`user` / `admin`) |
+| `vx_profiles` | Единый профиль пользователя (display_name, hh_applicant_id, avito_user_id, подписка) |
 
-Таблицы изолированы от таблиц Telegram-бота (`users`, `subscriptions` и др.) — общий только Supabase-проект.
+`vx_profiles` — кросс-проектная таблица, общая с `vacantrix-platform` и `vacantrix-hh`.
 
 ### Скачивание платформы
 
-Кнопка «Скачать» на главной ведёт на:
+Hero-кнопка «Скачать Vacantrix Platform» ведёт на:
 ```
-https://github.com/vacantrix/vacantrix-platform/releases/latest/download/VacantrixLauncher.exe
+https://github.com/vacantrix/vacantrix-platform/releases/download/v1.0.0/VacantrixLauncher.exe
 ```
-Ссылка обновляется автоматически через `launcher/release.py` в `vacantrix-platform`.
+
+> ⚠️ URL захардкожен на `v1.0.0` — в репо platform два релиза, `/latest/` указывает на `avito-v1.0.0`
+> где нет `VacantrixLauncher.exe`. После удаления лишнего релиза вернуть `/releases/latest/download/`.
+
+Все URL приложений в `web_apps`:
+- `Vacantrix` (HH-бот): `github.com/vacantrix/Vacantrixbot/releases/latest/download/Vacantrix.exe`
+- `Vacantrix Platform`: `github.com/vacantrix/vacantrix-platform/releases/download/v1.0.0/VacantrixLauncher.exe`
+- `Vacantrix Авито`: `github.com/vacantrix/vacantrix-avito/releases/latest/download/VacantrixAvito.exe`
 
 ## Связанные проекты
 
 | Проект | Связь |
 |--------|-------|
-| `vacantrix-platform` | Публикует релизы EXE, которые раздаёт этот сайт |
+| `vacantrix-platform` | Публикует релизы EXE (`VacantrixLauncher.exe`), раздаёт этот сайт |
 | `vacantrix-hh` | Тот же Supabase-проект; Telegram-бот управляет подписками |
+| `vacantrix-avito` | Авито-бот, отдельный репо; релиз `vacantrix-avito/VacantrixAvito.exe` |
+| `vacantrix-tasks` | Биржа задач — использует те же `vx_profiles` |
