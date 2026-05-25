@@ -34,8 +34,8 @@ git push
 
 GitHub Pages пересобирается автоматически (~1 мин).
 
-- **Сайт:** `https://romakotel30-cell.github.io/vacantrix-web/`
-- **Админ-панель:** `https://romakotel30-cell.github.io/vacantrix-web/admin.html`
+- **Сайт:** `https://vacantrix.github.io/vacantrix-web/`
+- **Админ-панель:** `https://vacantrix.github.io/vacantrix-web/admin.html`
 
 ## Конфигурация
 
@@ -90,7 +90,7 @@ const SUPABASE_ANON = '...';  // anon/publishable ключ
 
 Кнопка «Скачать» на главной ведёт на:
 ```
-https://github.com/romakotel30-cell/vacantrix-platform/releases/latest/download/VacantrixLauncher.exe
+https://github.com/vacantrix/vacantrix-platform/releases/latest/download/VacantrixLauncher.exe
 ```
 Ссылка обновляется автоматически через `launcher/release.py` в `vacantrix-platform`.
 
