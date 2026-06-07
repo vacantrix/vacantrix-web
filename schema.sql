@@ -85,9 +85,11 @@ CREATE POLICY "roles_admin_all" ON web_user_roles
     EXISTS (SELECT 1 FROM web_user_roles WHERE user_id = auth.uid() AND role = 'admin')
   );
 
--- OTP: пользователь может читать/вставлять свои записи
-CREATE POLICY "otp_own" ON web_login_otp
-  FOR ALL USING (true); -- контролируется на уровне кода
+-- OTP: server-only. Сайт использует встроенный Supabase OTP (signInWithOtp),
+-- эта таблица обслуживается только серверным кодом (service_role обходит RLS).
+-- НИКАКИХ permissive-политик: коды входа не должны быть доступны клиентским ролям.
+-- (Старая политика otp_own FOR ALL USING(true) открывала коды всем — удалена 2026-06-05.)
+REVOKE ALL ON web_login_otp FROM anon, authenticated;
 
 -- ── Функция: авто-обновление updated_at ──────────────────────────────
 CREATE OR REPLACE FUNCTION update_updated_at()

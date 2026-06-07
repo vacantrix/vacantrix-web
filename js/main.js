@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   window._initReveal = _initReveal;
 
-  const _PLATFORM_URL = 'https://github.com/vacantrix/vacantrix-platform/releases/download/v1.0.0/VacantrixLauncher.exe';
+  const _PLATFORM_URL = 'https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe';
 
   // ── Navbar ────────────────────────────────────────────────────────────
   function _updateNavbar(user, isAdmin) {
