@@ -7,7 +7,8 @@ const Apps = (() => {
   let _cachedApps = [];
 
   async function load() {
-    const { data, error } = await db
+    // dbPublic (anon, без сессии) — каталог не должен зависеть от токена пользователя.
+    const { data, error } = await dbPublic
       .from('web_apps')
       .select('*')
       .eq('active', true)

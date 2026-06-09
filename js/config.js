@@ -14,5 +14,14 @@ const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   },
 });
 
+// Публичный клиент БЕЗ пользовательской сессии — для чтения открытых данных
+// (каталог приложений и т.п.). Главный клиент `db` при наличии сессии цепляет
+// токен пользователя; если он протух и не обновился, публичные запросы падают
+// 401 и каталог «пропадает». dbPublic всегда ходит с anon-ключом → каталог
+// грузится независимо от состояния авторизации.
+const dbPublic = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+});
+
 // Время жизни OTP (минуты) — должно совпадать с настройкой в Supabase Auth
 const OTP_TTL_MIN = 5;
