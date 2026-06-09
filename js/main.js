@@ -377,8 +377,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // ── Подписка на изменения авторизации ────────────────────────────────
   Auth.onChange(async (user, isAdmin) => {
     if (user) {
-      // Загружаем профиль из vx_profiles и потом обновляем UI
-      await Profile.load(user.id);
+      // Загружаем профиль из vx_profiles; ошибка не должна ломать остальной UI/каталог
+      try { await Profile.load(user.id); }
+      catch (e) { console.warn('Profile.load error:', e.message); }
     }
     _updateNavbar(user, isAdmin);
     Apps.rerender();
@@ -403,15 +404,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (e.message !== 'auth_timeout') console.warn('Auth.init error:', e.message);
     }
 
-    // Загружаем профиль платформы и обновляем UI
+    // Загружаем профиль платформы и обновляем UI.
+    // ВАЖНО: ошибка профиля (например, протухшая сессия в localStorage) НЕ должна
+    // прерывать загрузку каталога — иначе приложения «пропадают» в обычном браузере,
+    // но видны в инкогнито. Поэтому Profile.load обёрнут в try/catch.
     const curUser = Auth.currentUser();
-    if (curUser) await Profile.load(curUser.id);
+    if (curUser) {
+      try { await Profile.load(curUser.id); }
+      catch (e) { console.warn('Profile.load error:', e.message); }
+    }
     _updateNavbar(curUser, Auth.isAdmin());
     _renderSettings(curUser);
     _updateHeroBtn(curUser);
 
-    // Площадки (статика) и приложения
-    Platforms.loadAndRender();
+    // Площадки и каталог приложений — грузим ВСЕГДА, независимо от авторизации.
+    try { Platforms.loadAndRender(); } catch (e) { console.warn('Platforms error:', e); }
     await Apps.loadAndRender().catch(e => console.warn('Apps error:', e));
 
     _initReveal();
