@@ -5,7 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Vacantrix</title>
   <meta name="description" content="Умные инструменты для поиска работы. Автоотклик на hh.ru — быстро, безопасно, автоматически.">
-  <link rel="stylesheet" href="css/main.css?v=20260609c">
+  <!-- Просим браузер всегда перепроверять HTML (свежая разметка без ручного обновления) -->
+  <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+  <!-- CSS грузим с авто-меткой версии (всегда свежий стиль). noscript — запасной вариант -->
+  <script>document.write('<link rel="stylesheet" href="css/main.css?v=' + Date.now() + '">');</script>
+  <noscript><link rel="stylesheet" href="css/main.css"></noscript>
 </head>
 <body>
 
@@ -271,14 +275,23 @@
 <!-- ════════════════════════════════════════════════════════════════════
      Скрипты
 ════════════════════════════════════════════════════════════════════ -->
-<!-- ?v=… — версия для сброса кэша браузера. Поднимать при изменении JS/CSS. -->
+<!-- Supabase SDK — внешний, версионируется через @2 -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/config.js?v=20260609c"></script>
-<script src="js/auth.js?v=20260609c"></script>
-<script src="js/profile.js?v=20260609c"></script>
-<script src="js/platforms.js?v=20260609c"></script>
-<script src="js/apps.js?v=20260609c"></script>
-<script src="js/main.js?v=20260609c"></script>
+<!-- Свои скрипты грузим с авто-меткой версии (Date.now): браузер всегда берёт
+     свежие файлы — ручной Ctrl+F5 не нужен. document.write сохраняет ПОРЯДОК
+     загрузки и срабатывает ДО DOMContentLoaded, поэтому слушатель в main.js
+     регистрируется корректно. Минус: JS не кэшируется между загрузками (файлы
+     ~30 КБ, незаметно). -->
+<script>
+  (function () {
+    var v = Date.now();
+    var files = ['js/config.js', 'js/auth.js', 'js/profile.js',
+                 'js/platforms.js', 'js/apps.js', 'js/main.js'];
+    for (var i = 0; i < files.length; i++) {
+      document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');
+    }
+  })();
+</script>
 
 </body>
 </html>
