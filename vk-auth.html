@@ -10,20 +10,21 @@
       margin: 0; background: #0f0f13; color: #e6e6ec;
       font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; gap: 16px; padding: 20px;
+      justify-content: center; gap: 14px; padding: 20px;
     }
     #status { font-size: 14px; color: #a8a8b0; text-align: center; }
-    #widget { min-height: 120px; }
+    #qr, #onetap { min-height: 60px; }
     #err { font-size: 12px; color: #ff6b6b; white-space: pre-wrap;
            max-width: 92%; text-align: center; }
-    .hint { font-size: 12px; color: #6a6a74; text-align: center; max-width: 360px; }
+    .hint { font-size: 12px; color: #6a6a74; text-align: center; max-width: 380px; }
   </style>
 </head>
 <body>
   <div id="status">Загрузка входа ВКонтакте…</div>
-  <div id="widget"></div>
-  <div class="hint">Отсканируйте QR-код приложением ВКонтакте на телефоне
-    (Профиль → меню → «Войти по QR-коду»), либо войдите по телефону.</div>
+  <div id="qr"></div>
+  <div class="hint">Отсканируйте QR-код приложением ВКонтакте на телефоне,
+    либо войдите кнопкой ниже.</div>
+  <div id="onetap"></div>
   <div id="err"></div>
 
   <script src="https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js"></script>
@@ -36,11 +37,13 @@
       var statusEl = document.getElementById('status');
       var errEl = document.getElementById('err');
 
+      function log() { try { console.log.apply(console, ['[vkauth]'].concat([].slice.call(arguments))); } catch (_) {} }
       function showErr(e) {
-        try { errEl.textContent = (typeof e === 'string') ? e : JSON.stringify(e); }
-        catch (_) { errEl.textContent = String(e); }
+        var s; try { s = (typeof e === 'string') ? e : JSON.stringify(e); } catch (_) { s = String(e); }
+        errEl.textContent = s; log('ERROR', s);
       }
       function done(data) {
+        log('exchange result', JSON.stringify(data));
         var t = data && (data.access_token || data.token) || '';
         var uid = data && (data.user_id || data.userId) || '';
         if (!t) { showErr('Нет access_token: ' + JSON.stringify(data)); return; }
@@ -48,31 +51,59 @@
                         '&user_id=' + encodeURIComponent(uid);
       }
       function onLogin(payload) {
+        log('LOGIN_SUCCESS payload', JSON.stringify(payload));
         statusEl.textContent = 'Завершаю вход…';
-        try {
-          window.VKID.Auth.exchangeCode(payload.code, payload.device_id)
-            .then(done).catch(showErr);
-        } catch (e) { showErr(e); }
+        try { window.VKID.Auth.exchangeCode(payload.code, payload.device_id).then(done).catch(showErr); }
+        catch (e) { showErr(e); }
       }
+
       function init() {
-        if (!('VKIDSDK' in window)) { statusEl.textContent = 'Не удалось загрузить VK ID SDK'; return; }
+        if (!('VKIDSDK' in window)) { statusEl.textContent = 'VK ID SDK не загрузился'; log('no VKIDSDK'); return; }
         var VKID = window.VKID = window.VKIDSDK;
+        log('VKID keys:', JSON.stringify(Object.keys(VKID)));
+        try { log('WidgetEvents:', JSON.stringify(VKID.WidgetEvents)); } catch (_) {}
+        try { log('OneTapInternalEvents:', JSON.stringify(VKID.OneTapInternalEvents)); } catch (_) {}
+        try { log('QRCodeInternalEvents:', JSON.stringify(VKID.QRCodeInternalEvents)); } catch (_) {}
+
         VKID.Config.init({
           app: APP, redirectUrl: REDIRECT,
           responseMode: VKID.ConfigResponseMode.Callback,
           source: VKID.ConfigSource.LOWCODE, scope: SCOPE,
         });
-        statusEl.textContent = 'Войдите по QR-коду или телефону:';
+        statusEl.textContent = 'Войдите по QR-коду или кнопкой:';
+
+        var SUCCESS = 'login_success';
+        function attach(widget) {
+          try { widget.on(VKID.WidgetEvents.ERROR, showErr); } catch (_) {}
+          // подписываемся на все возможные имена события успеха
+          var names = [];
+          try { if (VKID.OneTapInternalEvents) names.push(VKID.OneTapInternalEvents.LOGIN_SUCCESS); } catch (_) {}
+          try { if (VKID.QRCodeInternalEvents) names.push(VKID.QRCodeInternalEvents.LOGIN_SUCCESS); } catch (_) {}
+          names.push('login_success'); names.push('LOGIN_SUCCESS');
+          names.forEach(function (n) { try { widget.on(n, onLogin); } catch (_) {} });
+          return widget;
+        }
+
+        // 1) QR-виджет (если есть в SDK)
+        if (typeof VKID.QRCode === 'function') {
+          try {
+            log('render QRCode');
+            attach(new VKID.QRCode()).render({ container: document.getElementById('qr') });
+          } catch (e) { showErr(e); }
+        } else {
+          log('VKID.QRCode отсутствует');
+          document.querySelector('.hint').textContent = 'QR-виджет недоступен в этой версии SDK — войдите кнопкой:';
+        }
+
+        // 2) OneTap (кнопка входа — на всякий случай)
         try {
-          var oneTap = new VKID.OneTap();
-          oneTap.render({
-            container: document.getElementById('widget'),
-            showAlternativeLogin: true,
-          })
-          .on(VKID.WidgetEvents.ERROR, showErr)
-          .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, onLogin);
+          log('render OneTap');
+          attach(new VKID.OneTap()).render({
+            container: document.getElementById('onetap'), showAlternativeLogin: true,
+          });
         } catch (e) { showErr(e); }
       }
+
       if ('VKIDSDK' in window) { init(); }
       else {
         window.addEventListener('load', init);
