@@ -1,297 +1,314 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vacantrix</title>
-  <meta name="description" content="Умные инструменты для поиска работы. Автоотклик на hh.ru — быстро, безопасно, автоматически.">
-  <!-- Просим браузер всегда перепроверять HTML (свежая разметка без ручного обновления) -->
-  <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
-  <!-- CSS грузим с авто-меткой версии (всегда свежий стиль). noscript — запасной вариант -->
-  <script>document.write('<link rel="stylesheet" href="css/main.css?v=' + Date.now() + '">');</script>
-  <noscript><link rel="stylesheet" href="css/main.css"></noscript>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vacantrix — освободите своё время от рутины</title>
+<meta name="description" content="Vacantrix берёт на себя отклики на вакансии, публикации в соцсетях и поиск клиентов — пока вы занимаетесь тем, что важно. Десктоп-инструменты для Windows. Бесплатный старт.">
+<meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ====================================================================
+   Vacantrix — главная (пивот: «закрываем боль, возвращаем время»)
+   Тёмный индиго-неон (стилистика Publisher). Self-contained.
+   ==================================================================== */
+:root{
+  --bg:#0a0a0c; --bg2:#08080a; --panel:#0f0f13; --card:#141318; --card2:#17161d;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.12);
+  --ac:#8f73ff; --ac2:#6d4aff; --ac-d:#4a2fd0; --acr:109,74,255;
+  --ok:#58e08a;
+  --tx:#e9e9ef; --tx2:#a2a2ad; --tx3:#66666f;
+  --r:10px; --r2:14px; --r3:18px; --cont:1080px;
+  --f:'Inter',-apple-system,'Segoe UI',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--tx);font-family:var(--f);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;overflow-x:hidden}
+img{display:block;max-width:100%}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:var(--cont);margin:0 auto;padding:0 28px}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3)}
+.gw{background:linear-gradient(120deg,#fff 28%,var(--ac));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+/* nav */
+.nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:26px;height:62px;padding:0 28px;background:rgba(10,10,12,.72);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.01em}
+.nav .brand .d{width:22px;height:22px;border-radius:7px;background:linear-gradient(140deg,var(--ac),var(--ac-d));box-shadow:0 0 16px rgba(var(--acr),.55)}
+.nav .links{display:flex;gap:22px;margin-left:6px}
+.nav .links a{color:var(--tx2);font-size:14px;font-weight:500}.nav .links a:hover{color:var(--tx)}
+.nav .right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 20px;border-radius:var(--r);font-size:14.5px;font-weight:600;border:1px solid transparent;cursor:pointer;white-space:nowrap;font-family:var(--f)}
+.btn-pri{background:linear-gradient(180deg,#9b82ff,var(--ac2));color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.22) inset,0 8px 24px rgba(var(--acr),.38)}
+.btn-pri:hover{filter:brightness(1.06)}
+.btn-gh{color:var(--tx);border-color:var(--line2);background:rgba(255,255,255,.02)}
+.btn-gh:hover{border-color:var(--tx3)}
+.nav .btn{height:38px;padding:0 16px;font-size:13.5px}
+.lg{height:48px;padding:0 24px;font-size:15px}
+
+/* hero */
+.hero{position:relative;padding:84px 0 30px;overflow:hidden}
+.hero::before{content:'';position:absolute;left:50%;top:-12%;transform:translateX(-50%);width:90vw;height:60vh;z-index:0;background:radial-gradient(ellipse 50% 50% at 50% 0%,rgba(var(--acr),.16),transparent 70%);pointer-events:none}
+.hero .wrap{position:relative;z-index:1}
+.hero h1{font-size:clamp(38px,6vw,62px);font-weight:800;letter-spacing:-.03em;line-height:1.05;max-width:780px;margin:16px 0 18px}
+.hero .sub{color:var(--tx2);font-size:clamp(16px,2vw,19px);line-height:1.55;max-width:560px;margin-bottom:28px}
+.hero .cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.hero .trust{margin-top:18px;color:var(--tx3);font-size:13px;display:flex;gap:18px;flex-wrap:wrap}
+.hero .trust span{display:flex;align-items:center;gap:6px}.hero .trust .ok{color:var(--ok)}
+
+/* device frame */
+.device{margin:48px auto 0;max-width:880px;border:1px solid var(--line2);border-radius:var(--r2);overflow:hidden;background:var(--panel);box-shadow:0 50px 120px -34px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.05)}
+.dv-bar{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);background:#121116}
+.dv-bar .dots{display:flex;gap:6px}.dv-bar .dots i{width:10px;height:10px;border-radius:50%}
+.dv-bar .dots i:nth-child(1){background:#ff5f57}.dv-bar .dots i:nth-child(2){background:#febc2e}.dv-bar .dots i:nth-child(3){background:#28c840}
+.dv-bar .ttl{font-size:12.5px;color:var(--tx2);font-weight:600}
+.dv-bar .saved{margin-left:auto;font-size:12px;color:var(--ok);background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.28);padding:4px 11px;border-radius:999px;font-weight:600}
+.dv-body{display:grid;grid-template-columns:190px 1fr;min-height:300px}
+.dv-side{border-right:1px solid var(--line);padding:14px 9px;background:#0d0c11}
+.dv-side .cap{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase;padding:6px 9px}
+.dv-row{display:flex;align-items:center;gap:9px;padding:9px;border-radius:8px;color:var(--tx2);font-size:13px;font-weight:500;position:relative}
+.dv-row .ic{width:18px;height:18px;border-radius:5px;background:linear-gradient(140deg,#2a2436,#1a1722);display:grid;place-items:center;font-size:11px}
+.dv-row.on{background:rgba(var(--acr),.1);color:var(--tx)}
+.dv-row.on::before{content:'';position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--ac)}
+.dv-main{padding:18px 20px}
+.dv-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.dv-h .t{font-size:15px;font-weight:600}
+.dv-pill{font-size:11px;color:var(--ok);background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3);padding:3px 10px;border-radius:999px;font-weight:600}
+.log{display:flex;flex-direction:column;gap:8px}
+.log .l{display:flex;align-items:center;gap:11px;padding:11px 13px;background:var(--card);border:1px solid var(--line);border-radius:9px;font-size:13px}
+.log .l .ck{width:18px;height:18px;border-radius:50%;background:rgba(46,204,113,.15);color:var(--ok);display:grid;place-items:center;font-size:11px;flex-shrink:0}
+.log .l .src{margin-left:auto;color:var(--tx3);font-size:12px}
+.log .l.pend .ck{background:rgba(var(--acr),.15);color:var(--ac)}
+.dv-prog{margin-top:14px;height:6px;background:#0d0c11;border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.dv-prog i{display:block;height:100%;width:62%;background:linear-gradient(90deg,var(--ac-d),var(--ac))}
+.dv-cap{margin-top:9px;font-size:12px;color:var(--tx3)}
+
+/* sections */
+.sec{padding:72px 0}
+.sec .head{max-width:620px;margin-bottom:38px}
+.sec .head h2{font-size:clamp(28px,3.4vw,38px);font-weight:800;letter-spacing:-.02em;line-height:1.12;margin:12px 0 12px}
+.sec .head p{color:var(--tx2);font-size:16px;line-height:1.6}
+.center{text-align:center;margin-left:auto;margin-right:auto}
+
+/* pain cards */
+.pains{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.pain{border:1px solid var(--line);border-radius:var(--r2);background:var(--card);padding:24px;display:flex;flex-direction:column;gap:12px}
+.pain .ic{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:linear-gradient(140deg,#241f33,#16131f);border:1px solid var(--line)}
+.pain h3{font-size:17px;font-weight:700}
+.pain p{color:var(--tx2);font-size:14px;line-height:1.55;flex:1}
+.pain .relief{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ac);background:rgba(var(--acr),.08);border:1px solid rgba(var(--acr),.25);border-radius:9px;padding:9px 12px}
+
+/* time band */
+.timeband{border:1px solid var(--line2);border-radius:var(--r3);background:linear-gradient(135deg,rgba(var(--acr),.12),rgba(var(--acr),.02));padding:38px;display:grid;grid-template-columns:.8fr 1.2fr;gap:36px;align-items:center}
+.timeband .big{font-size:clamp(44px,6vw,68px);font-weight:900;letter-spacing:-.03em;line-height:1}
+.timeband .big .u{display:block;font-size:16px;font-weight:600;color:var(--tx2);letter-spacing:0;margin-top:10px;max-width:240px}
+.trow{display:flex;flex-direction:column;gap:10px}
+.trow .r{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:11px;padding:13px 16px}
+.trow .r .what{font-size:14px;color:var(--tx)}
+.trow .r .old{font-size:13px;color:var(--tx3);text-decoration:line-through}
+.trow .r .new{font-size:13.5px;font-weight:700;color:var(--ac);min-width:120px;text-align:right}
+
+/* steps */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.step{border:1px solid var(--line);border-radius:var(--r2);background:var(--card);padding:24px}
+.step .n{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;color:#fff;font-size:17px;background:linear-gradient(140deg,var(--ac),var(--ac-d));box-shadow:0 6px 18px rgba(var(--acr),.4);margin-bottom:14px}
+.step h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.step p{color:var(--tx2);font-size:14px;line-height:1.55}
+
+/* tools */
+.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.tcard{border:1px solid var(--line);border-radius:var(--r2);background:var(--card);padding:18px;display:flex;flex-direction:column;gap:11px;transition:border-color .2s,transform .2s}
+.tcard:hover{border-color:var(--line2);transform:translateY(-3px)}
+.tcard .top{display:flex;align-items:center;gap:12px}
+.tcard .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:linear-gradient(140deg,#241f33,#16131f);border:1px solid var(--line);overflow:hidden}
+.tcard .ico img{width:100%;height:100%;object-fit:cover}
+.tcard .nm{font-size:15px;font-weight:700}
+.tcard .cat{font-size:11px;color:var(--tx3)}
+.tcard .tg{color:var(--tx2);font-size:13.5px;line-height:1.5;flex:1}
+.tcard .ft{display:flex;align-items:center;justify-content:space-between;padding-top:11px;border-top:1px solid var(--line)}
+.tcard .pr{font-size:13px;font-weight:700;color:var(--ac)}.tcard .pr.soon{color:var(--tx3)}
+.badge{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:6px;margin-left:auto}
+.badge.live{color:var(--ok);background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3)}
+.badge.soon{color:var(--tx3);background:rgba(255,255,255,.04);border:1px solid var(--line)}
+
+/* pricing */
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
+.plan{border:1px solid var(--line);border-radius:var(--r2);padding:26px 22px;background:var(--card);display:flex;flex-direction:column;gap:13px}
+.plan.feat{border-color:rgba(var(--acr),.5);background:linear-gradient(180deg,rgba(var(--acr),.07),var(--card));box-shadow:0 0 0 1px rgba(var(--acr),.18)}
+.plan .pn{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2)}.plan .pn .star{color:var(--ac)}
+.plan .pa{font-size:38px;font-weight:800;letter-spacing:-.02em}.plan .pa small{font-size:15px;color:var(--tx3);font-weight:500}
+.plan .ps{color:var(--tx2);font-size:13.5px;line-height:1.5;min-height:38px}
+.plan ul{list-style:none;display:flex;flex-direction:column;gap:9px;flex:1}
+.plan ul li{display:flex;gap:9px;font-size:13.5px;color:var(--tx2)}.plan ul li::before{content:'✓';color:var(--ac);font-weight:700}
+.plan .btn{width:100%}
+
+/* trust strip */
+.trust-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.ts{border:1px solid var(--line);border-radius:12px;background:var(--bg2);padding:18px;display:flex;gap:11px;align-items:flex-start}
+.ts .e{font-size:19px}.ts b{display:block;font-size:13.5px;margin-bottom:3px}.ts span{color:var(--tx3);font-size:12px;line-height:1.5}
+
+/* final */
+.final{text-align:center;padding:72px 28px;border:1px solid var(--line2);border-radius:var(--r3);background:radial-gradient(70% 130% at 50% 0%,rgba(var(--acr),.16),transparent 60%),var(--panel)}
+.final h2{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.1}
+.final p{color:var(--tx2);font-size:16px;margin-bottom:26px}
+.final .sub{color:var(--tx3);font-size:13px;margin-top:14px}
+
+/* footer */
+.foot{border-top:1px solid var(--line);margin-top:10px}
+.foot .wrap{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:30px;padding:48px 28px}
+.foot .brand{display:flex;align-items:center;gap:10px;font-weight:800;margin-bottom:12px}
+.foot .brand .d{width:20px;height:20px;border-radius:6px;background:linear-gradient(140deg,var(--ac),var(--ac-d))}
+.foot .about{color:var(--tx3);font-size:13px;line-height:1.6;max-width:280px}
+.foot .col h4{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:14px}
+.foot .col a{display:block;color:var(--tx2);font-size:13.5px;margin-bottom:10px}.foot .col a:hover{color:var(--tx)}
+.foot .bot{border-top:1px solid var(--line);padding:18px 28px;color:var(--tx3);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+
+@media(max-width:920px){
+  .pains,.steps,.tools,.plans{grid-template-columns:1fr}
+  .trust-strip{grid-template-columns:repeat(2,1fr)}
+  .timeband{grid-template-columns:1fr;gap:24px}
+  .foot .wrap{grid-template-columns:1fr 1fr}
+  .nav .links{display:none}
+}
+</style>
 </head>
 <body>
 
-<!-- ── Navbar ──────────────────────────────────────────────────────── -->
-<nav class="navbar">
-  <span class="navbar-brand">Vacantrix</span>
-  <div class="navbar-actions">
-    <span id="user-info" class="hidden"></span>
-    <a id="btn-admin" class="btn-ghost hidden" href="admin.html">Панель</a>
-    <button id="btn-login" class="btn-primary">Войти</button>
-    <button id="btn-logout" class="btn-outline hidden">Выйти</button>
-  </div>
+<nav class="nav">
+  <span class="brand"><span class="d"></span>Vacantrix</span>
+  <span class="links"><a href="#pains">Возможности</a><a href="#tools">Инструменты</a><a href="#pricing">Цены</a></span>
+  <span class="right"><a class="btn btn-pri" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></span>
 </nav>
 
-<!-- ── Информационный баннер ────────────────────────────────────────── -->
-<div id="global-info" class="hidden"></div>
-
-<!-- ── Hero ────────────────────────────────────────────────────────── -->
-<section class="hero">
-  <h1 class="reveal">Автоматизация поиска работы</h1>
-  <p class="reveal" style="transition-delay:.12s">Умные инструменты, которые откликаются на вакансии за вас — пока вы занимаетесь другим.</p>
-  <div class="hero-cta reveal" style="transition-delay:.22s">
-    <button class="btn-download" id="hero-platform-dl">
-      <span class="dl-icon">🖥</span>
-      <div class="dl-text">
-        <span class="dl-title">Скачать Vacantrix Platform</span>
-        <span class="dl-sub">Бесплатно · Windows · Без установки</span>
-      </div>
-      <span class="dl-arrow">↓</span>
-    </button>
+<!-- HERO -->
+<section class="hero"><div class="wrap">
+  <span class="eyebrow">Десктоп-инструменты для Windows</span>
+  <h1>Освободите своё <span class="gw">время</span> от рутины</h1>
+  <p class="sub">Vacantrix берёт на себя отклики на вакансии, публикации в соцсетях и поиск клиентов — пока вы занимаетесь тем, что действительно важно.</p>
+  <div class="cta">
+    <a class="btn btn-pri lg" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать бесплатно</a>
+    <a class="btn btn-gh lg" href="#time">Как это экономит время →</a>
   </div>
-</section>
+  <div class="trust"><span><span class="ok">✓</span> Бесплатный старт без карты</span><span><span class="ok">✓</span> Не просим ваши пароли</span><span><span class="ok">✓</span> Данные остаются на вашем ПК</span></div>
 
-<!-- ── Вкладки ─────────────────────────────────────────────────────── -->
-<div class="main-content">
-  <nav class="tabs-nav">
-    <button class="tab-btn active" data-tab="platforms">Площадки</button>
-    <button class="tab-btn" data-tab="apps">Приложения</button>
-    <button class="tab-btn" data-tab="pricing">Тарифы</button>
-    <button class="tab-btn" data-tab="settings">Настройки</button>
-  </nav>
-
-  <div id="tab-platforms" class="tab-panel active">
-    <div id="platforms-content"><div class="spinner"></div></div>
-  </div>
-
-  <div id="tab-apps" class="tab-panel">
-    <div id="apps-content"><div class="spinner"></div></div>
-  </div>
-
-  <div id="tab-pricing" class="tab-panel">
-    <div class="pricing-header reveal">
-      <h2>Тарифы и цены</h2>
-      <p>Автоматизируйте отклики на hh.ru — выберите подходящий план</p>
-    </div>
-    <div class="pricing-grid">
-      <div class="pricing-card reveal" style="transition-delay:.05s">
-        <div class="pricing-badge">Пробный</div>
-        <div class="pricing-price pricing-free">3 дня</div>
-        <div class="pricing-period">бесплатно</div>
-        <ul class="pricing-features">
-          <li><span class="pf-icon">✓</span> До 30 откликов в день</li>
-          <li><span class="pf-icon">✓</span> Базовые фильтры вакансий</li>
-          <li><span class="pf-icon">✓</span> Сопроводительное письмо</li>
-          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Расширенные фильтры</span></li>
-          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Приоритетная поддержка</span></li>
-        </ul>
-        <a class="btn-outline pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Попробовать</a>
+  <div class="device">
+    <div class="dv-bar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">Vacantrix · HH-бот</span><span class="saved">⏱ Сэкономлено сегодня: 2 ч 40 мин</span></div>
+    <div class="dv-body">
+      <div class="dv-side">
+        <div class="cap">Инструменты</div>
+        <div class="dv-row on"><span class="ic">💼</span>HH-бот</div>
+        <div class="dv-row"><span class="ic">🟢</span>Авито-бот</div>
+        <div class="dv-row"><span class="ic">📡</span>Publisher</div>
+        <div class="dv-row"><span class="ic">📋</span>Биржа задач</div>
       </div>
-      <div class="pricing-card featured reveal" style="transition-delay:.12s">
-        <div class="pricing-badge popular">★ Популярный</div>
-        <div class="pricing-price">299<span>₽</span></div>
-        <div class="pricing-period">в месяц · 2 490 ₽/год</div>
-        <ul class="pricing-features">
-          <li><span class="pf-icon">✓</span> Неограниченные отклики</li>
-          <li><span class="pf-icon">✓</span> Расширенные фильтры</li>
-          <li><span class="pf-icon">✓</span> Сопроводительное письмо</li>
-          <li><span class="pf-icon">✓</span> Автообновление приложения</li>
-          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Несколько аккаунтов</span></li>
-        </ul>
-        <a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a>
-      </div>
-      <div class="pricing-card reveal" style="transition-delay:.19s">
-        <div class="pricing-badge">Максимум</div>
-        <div class="pricing-price">499<span>₽</span></div>
-        <div class="pricing-period">в месяц · 3 990 ₽/год</div>
-        <ul class="pricing-features">
-          <li><span class="pf-icon">✓</span> Всё из Стандарта</li>
-          <li><span class="pf-icon">✓</span> До 3 аккаунтов hh.ru</li>
-          <li><span class="pf-icon">✓</span> Персональная настройка</li>
-          <li><span class="pf-icon">✓</span> Поддержка 24/7</li>
-          <li><span class="pf-icon">✓</span> Ранний доступ к функциям</li>
-        </ul>
-        <a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a>
+      <div class="dv-main">
+        <div class="dv-h"><span class="t">Отклики идут автоматически</span><span class="dv-pill">● Работает за вас</span></div>
+        <div class="log">
+          <div class="l"><span class="ck">✓</span>Отклик отправлен · Frontend-разработчик<span class="src">hh.ru</span></div>
+          <div class="l"><span class="ck">✓</span>Отклик отправлен · UI/UX дизайнер<span class="src">hh.ru</span></div>
+          <div class="l"><span class="ck">✓</span>Отклик отправлен · Продуктовый аналитик<span class="src">hh.ru</span></div>
+          <div class="l pend"><span class="ck">↻</span>Отправляю · Менеджер проектов<span class="src">hh.ru</span></div>
+        </div>
+        <div class="dv-prog"><i></i></div>
+        <div class="dv-cap">31 из 50 откликов · сопроводительное письмо добавлено автоматически — вы в это время заняты своими делами</div>
       </div>
     </div>
-    <p class="pricing-note">Оплата и управление подпиской — через <a href="https://t.me/VacantrixB_O_T" target="_blank">Telegram-бот</a></p>
   </div>
+</div></section>
 
-  <div id="tab-settings" class="tab-panel">
-    <div id="settings-content"></div>
+<!-- PAIN -->
+<section class="sec" id="pains"><div class="wrap">
+  <div class="head"><span class="eyebrow">Знакомая картина?</span><h2>Каждый день одни и те же действия съедают ваши часы</h2><p>Vacantrix забирает рутину себе — и возвращает вам время на жизнь, семью и работу, которая действительно важна.</p></div>
+  <div class="pains">
+    <div class="pain"><div class="ic">⏳</div><h3>Отклики вручную</h3><p>Открыть вакансию, прочитать, написать сопроводительное, отправить — и так десятки раз каждый день. Часы уходят впустую.</p><span class="relief">→ Бот откликается сам, по вашим правилам</span></div>
+    <div class="pain"><div class="ic">🔁</div><h3>Постинг в каждую сеть</h3><p>Один и тот же пост вы вручную копируете во ВКонтакте, Telegram, Instagram и ещё несколько мест. Каждый раз заново.</p><span class="relief">→ Один пост — сразу во все площадки</span></div>
+    <div class="pain"><div class="ic">🔎</div><h3>Поиск клиентов и данных</h3><p>Сбор контактов, мониторинг цен и проверка конкурентов забирают целые вечера, которые могли быть свободными.</p><span class="relief">→ Инструменты соберут за вас</span></div>
   </div>
-</div>
+</div></section>
 
-<!-- ── Footer ──────────────────────────────────────────────────────── -->
-<footer>
-  <p>© 2026 Vacantrix. Все права защищены.</p>
+<!-- TIME -->
+<section class="sec" id="time" style="padding-top:0"><div class="wrap">
+  <div class="timeband">
+    <div>
+      <div class="big">до 40 часов<span class="u">в месяц — это целая рабочая неделя, которую вы тратили на рутину</span></div>
+    </div>
+    <div class="trow">
+      <div class="r"><span class="what">Отклики на вакансии</span><span class="old">2–3 ч в день</span><span class="new">7 минут настройки</span></div>
+      <div class="r"><span class="what">Публикация в 5 соцсетей</span><span class="old">40 мин на пост</span><span class="new">один клик</span></div>
+      <div class="r"><span class="what">Держать расписание в голове</span><span class="old">каждый день</span><span class="new">делает сам</span></div>
+    </div>
+  </div>
+</div></section>
+
+<!-- STEPS -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="head"><span class="eyebrow">Как это работает</span><h2>Три шага — и время снова ваше</h2></div>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h3>Скачайте лаунчер</h3><p>Один файл для Windows, без установки. Открывается за 30 секунд.</p></div>
+    <div class="step"><div class="n">2</div><h3>Выберите инструмент</h3><p>HH-бот, Publisher, Биржа задач — каждый бесплатен для старта.</p></div>
+    <div class="step"><div class="n">3</div><h3>Настройте один раз</h3><p>Дальше он работает сам, а вы занимаетесь тем, что важно.</p></div>
+  </div>
+</div></section>
+
+<!-- TOOLS -->
+<section class="sec" id="tools" style="padding-top:0"><div class="wrap">
+  <div class="head"><span class="eyebrow">Инструменты</span><h2>Выберите, что отнимает у вас больше всего времени</h2></div>
+  <div class="tools">
+    <div class="tcard"><div class="top"><div class="ico"><img src="img/hh_icon.png" onerror="this.parentNode.textContent='💼'"></div><div><div class="nm">HH-бот</div><div class="cat">Поиск работы</div></div><span class="badge live">Доступно</span></div><p class="tg">Откликается на вакансии hh.ru — без вас.</p><div class="ft"><span class="pr">от 299 ₽ · старт бесплатно</span></div></div>
+    <div class="tcard"><div class="top"><div class="ico"><img src="img/avito_icon.png" onerror="this.parentNode.textContent='🟢'"></div><div><div class="nm">Авито-бот</div><div class="cat">Поиск работы</div></div><span class="badge live">Доступно</span></div><p class="tg">Находит и откликается на вакансии Авито.</p><div class="ft"><span class="pr">от 299 ₽ · старт бесплатно</span></div></div>
+    <div class="tcard"><div class="top"><div class="ico">📡</div><div><div class="nm">Publisher</div><div class="cat">Продвижение</div></div><span class="badge live">Доступно</span></div><p class="tg">Один пост — сразу во все соцсети.</p><div class="ft"><span class="pr">Free / Pro 299 ₽</span></div></div>
+    <div class="tcard"><div class="top"><div class="ico"><img src="img/tasks_icon.png" onerror="this.parentNode.textContent='📋'"></div><div><div class="nm">Биржа задач</div><div class="cat">Подработка</div></div><span class="badge live">Доступно</span></div><p class="tg">Подработка рядом — без посредников.</p><div class="ft"><span class="pr">Бесплатно</span></div></div>
+    <div class="tcard"><div class="top"><div class="ico">🎯</div><div><div class="nm">Leads</div><div class="cat">Лиды</div></div><span class="badge soon">Скоро</span></div><p class="tg">База клиентов из 2ГИС — за минуты.</p><div class="ft"><span class="pr soon">В разработке</span></div></div>
+    <div class="tcard"><div class="top"><div class="ico">📊</div><div><div class="nm">Analytics</div><div class="cat">Аналитика</div></div><span class="badge soon">Скоро</span></div><p class="tg">Цены конкурентов — всегда перед глазами.</p><div class="ft"><span class="pr soon">В разработке</span></div></div>
+  </div>
+</div></section>
+
+<!-- PRICING -->
+<section class="sec" id="pricing" style="padding-top:0"><div class="wrap">
+  <div class="head center"><span class="eyebrow">Цены</span><h2>Начните бесплатно. Платите, если время вернулось</h2></div>
+  <div class="plans">
+    <div class="plan"><span class="pn">Старт</span><div class="pa">0 ₽</div><div class="ps">Попробовать, не думая о деньгах.</div>
+      <ul><li>10 откликов в месяц</li><li>Базовый Publisher</li><li>Биржа задач целиком</li><li>Без карты</li></ul>
+      <a class="btn btn-gh" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div>
+    <div class="plan feat"><span class="pn">Рабочий <span class="star">★</span></span><div class="pa">299 <small>₽/мес</small></div><div class="ps">Для тех, у кого рутина каждый день.</div>
+      <ul><li>Безлимит откликов</li><li>Отложенные посты</li><li>Все площадки Publisher</li><li>Автообновления</li></ul>
+      <a class="btn btn-pri" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a></div>
+    <div class="plan"><span class="pn">Профи</span><div class="pa">599 <small>₽/мес</small></div><div class="ps">Максимум, чтобы не думать о рутине вообще.</div>
+      <ul><li>Всё из «Рабочий»</li><li>До 3 аккаунтов</li><li>Приоритетная поддержка</li><li>Ранний доступ к новинкам</li></ul>
+      <a class="btn btn-gh" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a></div>
+  </div>
+</div></section>
+
+<!-- TRUST -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="trust-strip">
+    <div class="ts"><span class="e">🛡️</span><div><b>Без доступа к паролям</b><span>Мы не запрашиваем логины и пароли от ваших аккаунтов</span></div></div>
+    <div class="ts"><span class="e">💻</span><div><b>Данные у вас</b><span>Всё работает на вашем компьютере, локально</span></div></div>
+    <div class="ts"><span class="e">📦</span><div><b>Открытые релизы</b><span>Сборки публикуются на GitHub — можно проверить</span></div></div>
+    <div class="ts"><span class="e">💳</span><div><b>Бесплатно без карты</b><span>Платите, только когда сами захотите</span></div></div>
+  </div>
+</div></section>
+
+<!-- FINAL -->
+<section class="sec" style="padding-top:0"><div class="wrap">
+  <div class="final">
+    <h2>Сколько часов вы вернёте себе уже на этой неделе?</h2>
+    <p>Скачайте лаунчер и запустите первый инструмент за пару минут.</p>
+    <a class="btn btn-pri lg" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать Vacantrix — бесплатно</a>
+    <div class="sub">Windows 10/11 · без установки</div>
+  </div>
+</div></section>
+
+<!-- FOOTER -->
+<footer class="foot">
+  <div class="wrap">
+    <div><div class="brand"><span class="d"></span>Vacantrix</div><p class="about">Инструменты, которые работают — пока вы заняты важным.</p></div>
+    <div class="col"><h4>Продукт</h4><a href="#tools">Инструменты</a><a href="#pricing">Цены</a><a href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div>
+    <div class="col"><h4>Инструменты</h4><a href="#tools">HH-бот</a><a href="#tools">Авито-бот</a><a href="#tools">Publisher</a><a href="#tools">Биржа задач</a></div>
+    <div class="col"><h4>Поддержка</h4><a href="https://t.me/VacantrixB_O_T" target="_blank">Telegram</a><a href="terms.html">Соглашение</a></div>
+  </div>
+  <div class="bot"><span>© 2026 Vacantrix</span><a href="terms.html" style="color:var(--tx3)">Пользовательское соглашение</a></div>
 </footer>
-
-<!-- ════════════════════════════════════════════════════════════════════
-     Модальные окна
-════════════════════════════════════════════════════════════════════ -->
-
-<!-- Авторизация -->
-<div id="auth-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <button id="modal-close" class="modal-close" aria-label="Закрыть">✕</button>
-    <h2 id="auth-title">Вход</h2>
-    <form id="auth-form" onsubmit="return false">
-      <div class="form-group">
-        <label for="auth-email">Email</label>
-        <input id="auth-email" type="email" class="form-input" placeholder="you@example.com" autocomplete="email" required>
-      </div>
-      <div class="form-group">
-        <label for="auth-password">Пароль</label>
-        <input id="auth-password" type="password" class="form-input" placeholder="Минимум 6 символов" autocomplete="current-password" required>
-      </div>
-      <div id="remember-row" class="form-check">
-        <input type="checkbox" id="auth-remember">
-        <label for="auth-remember">Запомнить меня на этом устройстве</label>
-      </div>
-      <p id="auth-error" class="form-error"></p>
-      <div class="form-actions">
-        <button id="auth-submit" type="button" class="btn-primary" data-mode="login">Войти</button>
-        <span id="switch-mode" class="form-switch">Нет аккаунта? Зарегистрироваться</span>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- OTP-подтверждение -->
-<div id="otp-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <button id="otp-close" class="modal-close" aria-label="Закрыть">✕</button>
-    <h2>Подтверждение входа</h2>
-    <p id="otp-hint" style="color:var(--text2);font-size:14px;margin-bottom:20px;"></p>
-    <div class="form-group">
-      <label for="otp-input">Код из письма</label>
-      <input id="otp-input" type="text" class="form-input"
-             placeholder="6-значный код" maxlength="6"
-             inputmode="numeric" autocomplete="one-time-code">
-    </div>
-    <p id="otp-error" class="form-error"></p>
-    <button id="otp-submit" class="btn-primary" style="width:100%;justify-content:center;padding:12px">
-      Подтвердить
-    </button>
-  </div>
-</div>
-
-<!-- Смена пароля -->
-<div id="pwd-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <button id="pwd-close" class="modal-close" aria-label="Закрыть">✕</button>
-    <h2>Изменить пароль</h2>
-    <div class="form-group">
-      <label for="pwd-new">Новый пароль</label>
-      <input id="pwd-new" type="password" class="form-input" placeholder="Минимум 6 символов" autocomplete="new-password">
-    </div>
-    <div class="form-group">
-      <label for="pwd-confirm">Повторите пароль</label>
-      <input id="pwd-confirm" type="password" class="form-input" placeholder="Повторите новый пароль" autocomplete="new-password">
-    </div>
-    <p id="pwd-error" class="form-error"></p>
-    <button id="pwd-submit" class="btn-primary" style="width:100%;justify-content:center;padding:12px">Сохранить</button>
-  </div>
-</div>
-
-<!-- Лайтбокс скриншотов -->
-<div id="lightbox" class="hidden">
-  <img id="lb-img" src="" alt="Скриншот">
-  <div class="lb-controls">
-    <button class="lb-btn" id="lb-prev" aria-label="Назад">‹</button>
-    <span id="lb-counter"></span>
-    <button class="lb-btn" id="lb-next" aria-label="Вперёд">›</button>
-  </div>
-  <button class="lb-btn" id="lb-close" aria-label="Закрыть" style="margin-top:4px">✕</button>
-</div>
-
-<!-- Гид по установке -->
-<div id="install-guide" class="modal-overlay hidden">
-  <div class="modal install-guide-modal">
-    <button class="modal-close" onclick="document.getElementById('install-guide').classList.add('hidden')" aria-label="Закрыть">✕</button>
-    <div class="ig-header">
-      <div class="ig-app-icon">🖥</div>
-      <div>
-        <h2 id="ig-title">Установка Vacantrix</h2>
-        <p>Файл скачивается — следуйте шагам</p>
-      </div>
-    </div>
-    <div class="ig-steps">
-      <div class="ig-step" id="igs-1">
-        <div class="ig-step-left">
-          <div class="ig-num">1</div>
-          <div class="ig-line"></div>
-        </div>
-        <div class="ig-step-body">
-          <strong>Файл загружается</strong>
-          <span>Vacantrix.exe сохраняется в папку «Загрузки»</span>
-        </div>
-        <div class="ig-check">✓</div>
-        <div class="ig-spinner"></div>
-      </div>
-      <div class="ig-step" id="igs-2">
-        <div class="ig-step-left">
-          <div class="ig-num">2</div>
-          <div class="ig-line"></div>
-        </div>
-        <div class="ig-step-body">
-          <strong>Откройте файл</strong>
-          <span>Нажмите на файл внизу браузера или нажмите <kbd>Ctrl+J</kbd></span>
-        </div>
-        <div class="ig-check">✓</div>
-        <div class="ig-spinner"></div>
-      </div>
-      <div class="ig-step" id="igs-3">
-        <div class="ig-step-left">
-          <div class="ig-num">3</div>
-          <div class="ig-line"></div>
-        </div>
-        <div class="ig-step-body">
-          <strong>Разрешите запуск</strong>
-          <span>Если Windows предупредит — нажмите «Подробнее» → «Запустить»</span>
-        </div>
-        <div class="ig-check">✓</div>
-        <div class="ig-spinner"></div>
-      </div>
-      <div class="ig-step" id="igs-4">
-        <div class="ig-step-left">
-          <div class="ig-num">4</div>
-        </div>
-        <div class="ig-step-body">
-          <strong>Приложение откроется</strong>
-          <span>Vacantrix запустится — готово!</span>
-        </div>
-        <div class="ig-check">✓</div>
-        <div class="ig-spinner"></div>
-      </div>
-    </div>
-    <div class="ig-hint">
-      <span>💡</span>
-      <span>Не видите файл? Нажмите <kbd>Ctrl+J</kbd> чтобы открыть загрузки</span>
-    </div>
-  </div>
-</div>
-
-<!-- ── Подвал ───────────────────────────────────────────────────────── -->
-<footer class="site-footer" style="text-align:center; padding:28px 16px; color:#6b7590; font-size:13px; border-top:1px solid rgba(255,255,255,.06);">
-  <a href="terms.html" style="color:#8893b0; text-decoration:none;">Пользовательское соглашение</a>
-  <span style="margin:0 8px;">·</span>
-  <span>© Vacantrix</span>
-</footer>
-
-<!-- ════════════════════════════════════════════════════════════════════
-     Скрипты
-════════════════════════════════════════════════════════════════════ -->
-<!-- Supabase SDK — внешний, версионируется через @2 -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<!-- Свои скрипты грузим с авто-меткой версии (Date.now): браузер всегда берёт
-     свежие файлы — ручной Ctrl+F5 не нужен. document.write сохраняет ПОРЯДОК
-     загрузки и срабатывает ДО DOMContentLoaded, поэтому слушатель в main.js
-     регистрируется корректно. Минус: JS не кэшируется между загрузками (файлы
-     ~30 КБ, незаметно). -->
-<script>
-  (function () {
-    var v = Date.now();
-    var files = ['js/config.js', 'js/auth.js', 'js/profile.js',
-                 'js/platforms.js', 'js/apps.js', 'js/main.js'];
-    for (var i = 0; i < files.length; i++) {
-      document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');
-    }
-  })();
-</script>
 
 </body>
 </html>
