@@ -3,15 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vacantrix — освободите своё время от рутины</title>
-<meta name="description" content="Vacantrix берёт на себя отклики на вакансии, публикации в соцсетях и поиск клиентов — пока вы занимаетесь тем, что важно. Десктоп-инструменты для Windows. Бесплатный старт.">
+<title>Vacantrix — экосистема инструментов, которые экономят ваше время</title>
+<meta name="description" content="Vacantrix — единая экосистема десктоп-инструментов для Windows: отклики на вакансии, кросс-постинг в соцсети, биржа задач. Освободите своё время от рутины.">
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 /* ====================================================================
-   Vacantrix — главная (пивот: «закрываем боль, возвращаем время»)
-   Тёмный индиго-неон (стилистика Publisher). Self-contained.
+   Vacantrix — главная (структура в духе apple.com: экосистема)
+   Тёмный индиго-неон. Self-contained. Видео в img/promo/.
+   РЕДАКТИРУЕМО-блоки помечены комментариями <!-- РЕДАКТИРУЕМО -->.
    ==================================================================== */
 :root{
   --bg:#0a0a0c; --bg2:#08080a; --panel:#0f0f13; --card:#141318; --card2:#17161d;
@@ -19,296 +20,461 @@
   --ac:#8f73ff; --ac2:#6d4aff; --ac-d:#4a2fd0; --acr:109,74,255;
   --ok:#58e08a;
   --tx:#e9e9ef; --tx2:#a2a2ad; --tx3:#66666f;
-  --r:10px; --r2:14px; --r3:18px; --cont:1080px;
+  --r:10px; --r2:14px; --r3:20px; --cont:1100px; --nav-h:52px;
   --f:'Inter',-apple-system,'Segoe UI',sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--tx);font-family:var(--f);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;overflow-x:hidden}
-img{display:block;max-width:100%}
+body{background:var(--bg);color:var(--tx);font-family:var(--f);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+img,video{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
 .wrap{max-width:var(--cont);margin:0 auto;padding:0 28px}
-.eyebrow{font-size:12px;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3)}
+.eyebrow{font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--tx3)}
 .gw{background:linear-gradient(120deg,#fff 28%,var(--ac));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-
-/* nav */
-.nav{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:26px;height:62px;padding:0 28px;background:rgba(10,10,12,.72);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-.nav .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;letter-spacing:-.01em}
-.nav .brand .d{width:22px;height:22px;border-radius:7px;background:linear-gradient(140deg,var(--ac),var(--ac-d));box-shadow:0 0 16px rgba(var(--acr),.55)}
-.nav .links{display:flex;gap:22px;margin-left:6px}
-.nav .links a{color:var(--tx2);font-size:14px;font-weight:500}.nav .links a:hover{color:var(--tx)}
-.nav .right{margin-left:auto;display:flex;align-items:center;gap:12px}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:42px;padding:0 20px;border-radius:var(--r);font-size:14.5px;font-weight:600;border:1px solid transparent;cursor:pointer;white-space:nowrap;font-family:var(--f)}
 .btn-pri{background:linear-gradient(180deg,#9b82ff,var(--ac2));color:#fff;box-shadow:0 1px 0 rgba(255,255,255,.22) inset,0 8px 24px rgba(var(--acr),.38)}
 .btn-pri:hover{filter:brightness(1.06)}
 .btn-gh{color:var(--tx);border-color:var(--line2);background:rgba(255,255,255,.02)}
 .btn-gh:hover{border-color:var(--tx3)}
-.nav .btn{height:38px;padding:0 16px;font-size:13.5px}
 .lg{height:48px;padding:0 24px;font-size:15px}
 
-/* hero */
-.hero{position:relative;padding:84px 0 30px;overflow:hidden}
-.hero::before{content:'';position:absolute;left:50%;top:-12%;transform:translateX(-50%);width:90vw;height:60vh;z-index:0;background:radial-gradient(ellipse 50% 50% at 50% 0%,rgba(var(--acr),.16),transparent 70%);pointer-events:none}
+/* ════ A. Sticky product-bar + мега-меню (Apple-nav) ════ */
+.topbar{position:sticky;top:0;z-index:60;background:rgba(10,10,12,.82);backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;gap:6px;height:var(--nav-h);max-width:var(--cont);margin:0 auto;padding:0 28px}
+.bar .brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:16px;letter-spacing:-.01em;margin-right:14px}
+.bar .brand .d{width:20px;height:20px;border-radius:6px;background:linear-gradient(140deg,var(--ac),var(--ac-d));box-shadow:0 0 14px rgba(var(--acr),.55)}
+.bar nav{display:flex;align-items:center;gap:2px}
+.navitem{position:static}
+.navitem>a{display:flex;align-items:center;gap:5px;height:var(--nav-h);padding:0 13px;color:var(--tx2);font-size:13.5px;font-weight:500;cursor:pointer}
+.navitem>a:hover,.navitem.open>a{color:var(--tx)}
+.navitem>a .ar{font-size:9px;opacity:.6;transition:transform .2s}
+.navitem.open>a .ar{transform:rotate(180deg)}
+.bar .spacer{margin-left:auto}
+.bar .right{display:flex;align-items:center;gap:10px}
+.bar .right .ghost{color:var(--tx2);font-size:13.5px;font-weight:500;padding:0 8px}
+.bar .right .ghost:hover{color:var(--tx)}
+.bar .right .dl{height:34px;padding:0 15px;font-size:13.5px}
+
+/* full-width mega panel */
+.mega{position:absolute;left:0;right:0;top:var(--nav-h);background:rgba(13,12,16,.97);backdrop-filter:blur(18px);border-bottom:1px solid var(--line2);
+  opacity:0;visibility:hidden;transform:translateY(-8px);transition:opacity .18s,transform .18s,visibility .18s;box-shadow:0 30px 60px -20px rgba(0,0,0,.7)}
+.navitem:hover .mega,.navitem.open .mega{opacity:1;visibility:visible;transform:translateY(0)}
+.mega-in{max-width:var(--cont);margin:0 auto;padding:26px 28px;display:grid;grid-template-columns:1.1fr 1fr;gap:30px}
+.mega-l .mt{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ac)}
+.mega-l h3{font-size:22px;font-weight:800;margin:8px 0 8px}
+.mega-l p{color:var(--tx2);font-size:14px;line-height:1.55;max-width:340px;margin-bottom:16px}
+.mega-links{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px}
+.mega-links a{display:flex;align-items:center;gap:8px;color:var(--tx2);font-size:13.5px;padding:6px 0}
+.mega-links a:hover{color:var(--ac)}
+.mega-links a .i{width:18px;text-align:center;opacity:.8}
+.mega-r{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);aspect-ratio:16/10}
+.mega-r img{width:100%;height:100%;object-fit:cover}
+.mega-soon{display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:13px}
+
+/* ════ B. Hero (видео-превью) ════ */
+.hero{position:relative;padding:64px 0 26px;text-align:center;overflow:hidden}
+.hero::before{content:'';position:absolute;left:50%;top:-10%;transform:translateX(-50%);width:90vw;height:55vh;z-index:0;background:radial-gradient(ellipse 50% 50% at 50% 0%,rgba(var(--acr),.16),transparent 70%);pointer-events:none}
 .hero .wrap{position:relative;z-index:1}
-.hero h1{font-size:clamp(38px,6vw,62px);font-weight:800;letter-spacing:-.03em;line-height:1.05;max-width:780px;margin:16px 0 18px}
-.hero .sub{color:var(--tx2);font-size:clamp(16px,2vw,19px);line-height:1.55;max-width:560px;margin-bottom:28px}
-.hero .cta{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.hero .trust{margin-top:18px;color:var(--tx3);font-size:13px;display:flex;gap:18px;flex-wrap:wrap}
-.hero .trust span{display:flex;align-items:center;gap:6px}.hero .trust .ok{color:var(--ok)}
+.hero h1{font-size:clamp(36px,5.6vw,60px);font-weight:900;letter-spacing:-.03em;line-height:1.04;max-width:820px;margin:14px auto 16px}
+.hero .sub{color:var(--tx2);font-size:clamp(16px,2vw,19px);line-height:1.55;max-width:560px;margin:0 auto 24px}
+.hero .cta{display:flex;gap:13px;justify-content:center;flex-wrap:wrap}
+.hero-video{position:relative;margin:42px auto 0;max-width:920px;border:1px solid var(--line2);border-radius:18px;overflow:hidden;background:#000;box-shadow:0 50px 130px -34px rgba(var(--acr),.45),inset 0 1px 0 rgba(255,255,255,.06)}
+.hero-video video{width:100%;aspect-ratio:16/9;object-fit:cover;display:block}
+.hero-video .frame-bar{position:absolute;top:0;left:0;right:0;height:34px;display:flex;align-items:center;gap:6px;padding:0 12px;background:linear-gradient(180deg,rgba(0,0,0,.5),transparent);z-index:2}
+.hero-video .frame-bar i{width:9px;height:9px;border-radius:50%}
+.hero-video .frame-bar i:nth-child(1){background:#ff5f57}.hero-video .frame-bar i:nth-child(2){background:#febc2e}.hero-video .frame-bar i:nth-child(3){background:#28c840}
 
-/* device frame */
-.device{margin:48px auto 0;max-width:880px;border:1px solid var(--line2);border-radius:var(--r2);overflow:hidden;background:var(--panel);box-shadow:0 50px 120px -34px rgba(0,0,0,.85),inset 0 1px 0 rgba(255,255,255,.05)}
-.dv-bar{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line);background:#121116}
-.dv-bar .dots{display:flex;gap:6px}.dv-bar .dots i{width:10px;height:10px;border-radius:50%}
-.dv-bar .dots i:nth-child(1){background:#ff5f57}.dv-bar .dots i:nth-child(2){background:#febc2e}.dv-bar .dots i:nth-child(3){background:#28c840}
-.dv-bar .ttl{font-size:12.5px;color:var(--tx2);font-weight:600}
-.dv-bar .saved{margin-left:auto;font-size:12px;color:var(--ok);background:rgba(46,204,113,.1);border:1px solid rgba(46,204,113,.28);padding:4px 11px;border-radius:999px;font-weight:600}
-.dv-body{display:grid;grid-template-columns:190px 1fr;min-height:300px}
-.dv-side{border-right:1px solid var(--line);padding:14px 9px;background:#0d0c11}
-.dv-side .cap{font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--tx3);text-transform:uppercase;padding:6px 9px}
-.dv-row{display:flex;align-items:center;gap:9px;padding:9px;border-radius:8px;color:var(--tx2);font-size:13px;font-weight:500;position:relative}
-.dv-row .ic{width:18px;height:18px;border-radius:5px;background:linear-gradient(140deg,#2a2436,#1a1722);display:grid;place-items:center;font-size:11px}
-.dv-row.on{background:rgba(var(--acr),.1);color:var(--tx)}
-.dv-row.on::before{content:'';position:absolute;left:0;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--ac)}
-.dv-main{padding:18px 20px}
-.dv-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
-.dv-h .t{font-size:15px;font-weight:600}
-.dv-pill{font-size:11px;color:var(--ok);background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3);padding:3px 10px;border-radius:999px;font-weight:600}
-.log{display:flex;flex-direction:column;gap:8px}
-.log .l{display:flex;align-items:center;gap:11px;padding:11px 13px;background:var(--card);border:1px solid var(--line);border-radius:9px;font-size:13px}
-.log .l .ck{width:18px;height:18px;border-radius:50%;background:rgba(46,204,113,.15);color:var(--ok);display:grid;place-items:center;font-size:11px;flex-shrink:0}
-.log .l .src{margin-left:auto;color:var(--tx3);font-size:12px}
-.log .l.pend .ck{background:rgba(var(--acr),.15);color:var(--ac)}
-.dv-prog{margin-top:14px;height:6px;background:#0d0c11;border:1px solid var(--line);border-radius:99px;overflow:hidden}
-.dv-prog i{display:block;height:100%;width:62%;background:linear-gradient(90deg,var(--ac-d),var(--ac))}
-.dv-cap{margin-top:9px;font-size:12px;color:var(--tx3)}
-
-/* sections */
-.sec{padding:72px 0}
-.sec .head{max-width:620px;margin-bottom:38px}
-.sec .head h2{font-size:clamp(28px,3.4vw,38px);font-weight:800;letter-spacing:-.02em;line-height:1.12;margin:12px 0 12px}
+/* ════ sections ════ */
+.sec{padding:74px 0}
+.sec .head{max-width:660px;margin:0 auto 44px;text-align:center}
+.sec .head h2{font-size:clamp(28px,3.6vw,42px);font-weight:900;letter-spacing:-.025em;line-height:1.1;margin:12px 0 12px}
 .sec .head p{color:var(--tx2);font-size:16px;line-height:1.6}
-.center{text-align:center;margin-left:auto;margin-right:auto}
 
-/* pain cards */
-.pains{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.pain{border:1px solid var(--line);border-radius:var(--r2);background:var(--card);padding:24px;display:flex;flex-direction:column;gap:12px}
-.pain .ic{width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:linear-gradient(140deg,#241f33,#16131f);border:1px solid var(--line)}
-.pain h3{font-size:17px;font-weight:700}
-.pain p{color:var(--tx2);font-size:14px;line-height:1.55;flex:1}
-.pain .relief{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ac);background:rgba(var(--acr),.08);border:1px solid rgba(var(--acr),.25);border-radius:9px;padding:9px 12px}
+/* ════ C. Экосистема (узлы + паутина) ════ */
+.eco-section{position:relative}
+.eco{position:relative;max-width:940px;margin:0 auto;aspect-ratio:1000/620}
+.eco-web{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.eco-web .lnk{stroke:rgba(var(--acr),.42);stroke-width:1.3;fill:none}
+.eco-web .lnk.main{stroke:rgba(var(--acr),.62);stroke-width:1.6;stroke-dasharray:6 10;animation:flow 3.2s linear infinite}
+.eco-web .lnk.faint{stroke:rgba(var(--acr),.18);stroke-dasharray:2 8}
+@keyframes flow{to{stroke-dashoffset:-160}}
+.eco-web .ring{animation:breathe 5s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.5}50%{opacity:1}}
+.node{position:absolute;transform:translate(-50%,-50%);z-index:2;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer;width:118px;text-align:center}
+.node .disc{width:74px;height:74px;border-radius:20px;display:grid;place-items:center;background:linear-gradient(150deg,var(--card2),var(--card));border:1px solid var(--line2);box-shadow:0 14px 34px -10px rgba(0,0,0,.7),inset 0 1px 0 rgba(255,255,255,.06);overflow:hidden;transition:transform .2s,border-color .2s,box-shadow .2s;font-size:32px}
+.node .disc img{width:78%;height:78%;object-fit:contain}
+.node:hover .disc{transform:translateY(-4px) scale(1.05);border-color:var(--ac);box-shadow:0 18px 40px -8px rgba(var(--acr),.5)}
+.node .nm{font-size:13px;font-weight:600;color:var(--tx)}
+.node .nm small{display:block;color:var(--tx3);font-weight:500;font-size:11px;margin-top:1px}
+.node .play{position:absolute;right:-3px;top:-3px;width:24px;height:24px;border-radius:50%;background:var(--ac2);color:#fff;display:grid;place-items:center;font-size:10px;border:2px solid var(--bg);box-shadow:0 4px 10px rgba(var(--acr),.5)}
+.node.soon .disc{filter:grayscale(.5) brightness(.78);border-style:dashed}
+.node.soon .nm small{color:var(--ac)}
+.node.hub{width:150px}
+.node.hub .disc{width:104px;height:104px;border-radius:28px;font-size:46px;background:radial-gradient(120% 120% at 50% 0%,rgba(var(--acr),.35),var(--card));border-color:var(--ac);box-shadow:0 0 0 1px rgba(var(--acr),.25),0 26px 60px -16px rgba(var(--acr),.6)}
+.node.hub .nm{font-size:14px;font-weight:800}
+/* node anchor positions (совпадают с координатами SVG ниже) */
+.n-hub{left:50%;top:50%}
+.n-platform{left:50%;top:11.3%}
+.n-hh{left:21.5%;top:26.6%}
+.n-pub{left:78.5%;top:26.6%}
+.n-tasks{left:21.5%;top:73.4%}
+.n-avito{left:78.5%;top:73.4%}
+.n-leads{left:9%;top:50%}
+.n-monitor{left:91%;top:50%}
+.n-analytics{left:50%;top:90.3%}
+.eco-hint{text-align:center;color:var(--tx3);font-size:13px;margin-top:18px}
 
-/* time band */
-.timeband{border:1px solid var(--line2);border-radius:var(--r3);background:linear-gradient(135deg,rgba(var(--acr),.12),rgba(var(--acr),.02));padding:38px;display:grid;grid-template-columns:.8fr 1.2fr;gap:36px;align-items:center}
-.timeband .big{font-size:clamp(44px,6vw,68px);font-weight:900;letter-spacing:-.03em;line-height:1}
-.timeband .big .u{display:block;font-size:16px;font-weight:600;color:var(--tx2);letter-spacing:0;margin-top:10px;max-width:240px}
-.trow{display:flex;flex-direction:column;gap:10px}
-.trow .r{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;background:rgba(0,0,0,.25);border:1px solid var(--line);border-radius:11px;padding:13px 16px}
-.trow .r .what{font-size:14px;color:var(--tx)}
-.trow .r .old{font-size:13px;color:var(--tx3);text-decoration:line-through}
-.trow .r .new{font-size:13.5px;font-weight:700;color:var(--ac);min-width:120px;text-align:right}
-
-/* steps */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.step{border:1px solid var(--line);border-radius:var(--r2);background:var(--card);padding:24px}
-.step .n{width:38px;height:38px;border-radius:11px;display:grid;place-items:center;font-weight:800;color:#fff;font-size:17px;background:linear-gradient(140deg,var(--ac),var(--ac-d));box-shadow:0 6px 18px rgba(var(--acr),.4);margin-bottom:14px}
-.step h3{font-size:16px;font-weight:700;margin-bottom:6px}
-.step p{color:var(--tx2);font-size:14px;line-height:1.55}
-
-/* tools */
-.tools{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-.tcard{border:1px solid var(--line);border-radius:var(--r2);background:var(--card);padding:18px;display:flex;flex-direction:column;gap:11px;transition:border-color .2s,transform .2s}
-.tcard:hover{border-color:var(--line2);transform:translateY(-3px)}
-.tcard .top{display:flex;align-items:center;gap:12px}
-.tcard .ico{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:22px;background:linear-gradient(140deg,#241f33,#16131f);border:1px solid var(--line);overflow:hidden}
-.tcard .ico img{width:100%;height:100%;object-fit:cover}
-.tcard .nm{font-size:15px;font-weight:700}
-.tcard .cat{font-size:11px;color:var(--tx3)}
-.tcard .tg{color:var(--tx2);font-size:13.5px;line-height:1.5;flex:1}
-.tcard .ft{display:flex;align-items:center;justify-content:space-between;padding-top:11px;border-top:1px solid var(--line)}
-.tcard .pr{font-size:13px;font-weight:700;color:var(--ac)}.tcard .pr.soon{color:var(--tx3)}
-.badge{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:6px;margin-left:auto}
+/* ════ D. Промо-полоса (видео играют инлайн) ════ */
+.promos{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.promo{border:1px solid var(--line);border-radius:var(--r2);overflow:hidden;background:var(--card);display:flex;flex-direction:column}
+.promo .v{aspect-ratio:16/9;background:#000;position:relative}
+.promo .v video{width:100%;height:100%;object-fit:cover}
+.promo .v .ph{position:absolute;inset:0;display:grid;place-items:center;color:var(--tx3);font-size:13px;background:linear-gradient(160deg,#1a1622,#0e0d13);text-align:center;padding:16px}
+.promo .b{padding:16px 18px}
+.promo .b .top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+.promo .b .ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:17px;background:linear-gradient(140deg,#241f33,#16131f);border:1px solid var(--line);overflow:hidden}
+.promo .b .ico img{width:100%;height:100%;object-fit:cover}
+.promo .b .nm{font-size:15px;font-weight:700}
+.promo .b p{color:var(--tx2);font-size:13px;line-height:1.5;margin-bottom:12px}
+.promo .b .ft{display:flex;align-items:center;justify-content:space-between}
+.promo .b .pr{font-size:12.5px;font-weight:700;color:var(--ac)}.promo .b .pr.soon{color:var(--tx3)}
+.badge{font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:6px}
 .badge.live{color:var(--ok);background:rgba(46,204,113,.12);border:1px solid rgba(46,204,113,.3)}
 .badge.soon{color:var(--tx3);background:rgba(255,255,255,.04);border:1px solid var(--line)}
 
-/* pricing */
-.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
-.plan{border:1px solid var(--line);border-radius:var(--r2);padding:26px 22px;background:var(--card);display:flex;flex-direction:column;gap:13px}
-.plan.feat{border-color:rgba(var(--acr),.5);background:linear-gradient(180deg,rgba(var(--acr),.07),var(--card));box-shadow:0 0 0 1px rgba(var(--acr),.18)}
-.plan .pn{font-size:13px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--tx2)}.plan .pn .star{color:var(--ac)}
-.plan .pa{font-size:38px;font-weight:800;letter-spacing:-.02em}.plan .pa small{font-size:15px;color:var(--tx3);font-weight:500}
-.plan .ps{color:var(--tx2);font-size:13.5px;line-height:1.5;min-height:38px}
-.plan ul{list-style:none;display:flex;flex-direction:column;gap:9px;flex:1}
-.plan ul li{display:flex;gap:9px;font-size:13.5px;color:var(--tx2)}.plan ul li::before{content:'✓';color:var(--ac);font-weight:700}
-.plan .btn{width:100%}
+/* ════ E. Блок ценности ════ */
+.value{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.vcard{border:1px solid var(--line);border-radius:var(--r2);background:var(--card);padding:24px}
+.vcard .ic{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;font-size:21px;background:linear-gradient(140deg,#241f33,#16131f);border:1px solid var(--line);margin-bottom:13px}
+.vcard h3{font-size:16px;font-weight:700;margin-bottom:6px}
+.vcard p{color:var(--tx2);font-size:14px;line-height:1.55}
 
-/* trust strip */
-.trust-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.ts{border:1px solid var(--line);border-radius:12px;background:var(--bg2);padding:18px;display:flex;gap:11px;align-items:flex-start}
-.ts .e{font-size:19px}.ts b{display:block;font-size:13.5px;margin-bottom:3px}.ts span{color:var(--tx3);font-size:12px;line-height:1.5}
+/* ════ F. Футер-«легенда» ════ */
+.foot{border-top:1px solid var(--line);background:var(--bg2);margin-top:30px}
+.foot-top{max-width:var(--cont);margin:0 auto;padding:54px 28px 36px;display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;gap:28px}
+.foot .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:17px;margin-bottom:12px}
+.foot .brand .d{width:22px;height:22px;border-radius:7px;background:linear-gradient(140deg,var(--ac),var(--ac-d))}
+.foot .about{color:var(--tx3);font-size:13px;line-height:1.6;max-width:260px;margin-bottom:16px}
+.foot .social{display:flex;gap:10px}
+.foot .social a{width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);display:grid;place-items:center;color:var(--tx2);font-size:15px}
+.foot .social a:hover{border-color:var(--ac);color:var(--ac)}
+.foot .col h4{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-bottom:14px}
+.foot .col a{display:block;color:var(--tx2);font-size:13.5px;margin-bottom:11px}
+.foot .col a:hover{color:var(--tx)}
+.foot .col a .s{font-size:9px;color:var(--ac);margin-left:5px;vertical-align:middle;border:1px solid rgba(var(--acr),.4);border-radius:4px;padding:1px 4px}
+.foot-bot{border-top:1px solid var(--line)}
+.foot-bot .in{max-width:var(--cont);margin:0 auto;padding:18px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;color:var(--tx3);font-size:12.5px}
+.foot-bot .in .lks{display:flex;gap:18px;flex-wrap:wrap}
+.foot-bot .in a:hover{color:var(--tx)}
 
-/* final */
-.final{text-align:center;padding:72px 28px;border:1px solid var(--line2);border-radius:var(--r3);background:radial-gradient(70% 130% at 50% 0%,rgba(var(--acr),.16),transparent 60%),var(--panel)}
-.final h2{font-size:clamp(28px,4vw,42px);font-weight:800;letter-spacing:-.02em;margin-bottom:14px;line-height:1.1}
-.final p{color:var(--tx2);font-size:16px;margin-bottom:26px}
-.final .sub{color:var(--tx3);font-size:13px;margin-top:14px}
+/* ════ Лайтбокс промо ════ */
+.lb{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.86);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:24px}
+.lb.on{display:flex}
+.lb-box{width:100%;max-width:900px;background:var(--panel);border:1px solid var(--line2);border-radius:16px;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.7)}
+.lb-box .bar2{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--line)}
+.lb-box .bar2 .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;font-size:15px;background:linear-gradient(140deg,#241f33,#16131f);border:1px solid var(--line);overflow:hidden}
+.lb-box .bar2 .ic img{width:100%;height:100%;object-fit:cover}
+.lb-box .bar2 .nm{font-size:15px;font-weight:700}
+.lb-box .bar2 .x{margin-left:auto;width:32px;height:32px;border-radius:8px;border:1px solid var(--line2);background:transparent;color:var(--tx2);cursor:pointer;font-size:16px}
+.lb-box .bar2 .x:hover{color:var(--tx);border-color:var(--tx3)}
+.lb-media{aspect-ratio:16/9;background:#000}
+.lb-media video{width:100%;height:100%;object-fit:contain;background:#000}
+.lb-media .soon{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--tx2);background:linear-gradient(160deg,#1a1622,#0e0d13)}
+.lb-media .soon img{width:90px;height:90px;border-radius:18px;object-fit:contain;opacity:.85}
 
-/* footer */
-.foot{border-top:1px solid var(--line);margin-top:10px}
-.foot .wrap{display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:30px;padding:48px 28px}
-.foot .brand{display:flex;align-items:center;gap:10px;font-weight:800;margin-bottom:12px}
-.foot .brand .d{width:20px;height:20px;border-radius:6px;background:linear-gradient(140deg,var(--ac),var(--ac-d))}
-.foot .about{color:var(--tx3);font-size:13px;line-height:1.6;max-width:280px}
-.foot .col h4{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:14px}
-.foot .col a{display:block;color:var(--tx2);font-size:13.5px;margin-bottom:10px}.foot .col a:hover{color:var(--tx)}
-.foot .bot{border-top:1px solid var(--line);padding:18px 28px;color:var(--tx3);font-size:12.5px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
-
-@media(max-width:920px){
-  .pains,.steps,.tools,.plans{grid-template-columns:1fr}
-  .trust-strip{grid-template-columns:repeat(2,1fr)}
-  .timeband{grid-template-columns:1fr;gap:24px}
-  .foot .wrap{grid-template-columns:1fr 1fr}
-  .nav .links{display:none}
+@media(max-width:900px){
+  .mega-in{grid-template-columns:1fr}.mega-r{display:none}
+  .promos,.value{grid-template-columns:1fr}
+  .foot-top{grid-template-columns:1fr 1fr}
+  /* паутина → вертикальный список */
+  .eco{aspect-ratio:auto;display:grid;grid-template-columns:repeat(2,1fr);gap:22px 10px;max-width:520px}
+  .eco-web{display:none}
+  .node{position:static;transform:none;width:auto}
+  .node.hub{grid-column:1/-1}
+  .bar nav{display:none}
 }
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <span class="brand"><span class="d"></span>Vacantrix</span>
-  <span class="links"><a href="#pains">Возможности</a><a href="#tools">Инструменты</a><a href="#pricing">Цены</a></span>
-  <span class="right"><a class="btn btn-pri" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></span>
-</nav>
+<!-- ════════════════ A. ВЕРХНЯЯ СТРОКА ПРОДУКТОВ + МЕГА-МЕНЮ ════════════════ -->
+<header class="topbar">
+  <div class="bar">
+    <a class="brand" href="#"><span class="d"></span>Vacantrix</a>
+    <nav id="pnav">
+      <!-- РЕДАКТИРУЕМО: пункты-продукты и их мега-меню -->
+      <div class="navitem" data-menu>
+        <a>HH-бот <span class="ar">▾</span></a>
+        <div class="mega"><div class="mega-in">
+          <div class="mega-l"><div class="mt">Поиск работы</div><h3>HH-бот</h3>
+            <p>Автоматические отклики на вакансии hh.ru по вашим правилам — пока вы заняты другим.</p>
+            <div class="mega-links">
+              <a href="#eco"><span class="i">✦</span>Как это работает</a>
+              <a href="#promos"><span class="i">▶</span>Смотреть ролик</a>
+              <a href="#pricing"><span class="i">₽</span>Тарифы</a>
+              <a href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe"><span class="i">↓</span>Скачать</a>
+            </div>
+          </div>
+          <div class="mega-r"><img src="img/hh_icon.png" alt="" onerror="this.parentNode.innerHTML='<div class=mega-soon>превью</div>'"></div>
+        </div></div>
+      </div>
 
-<!-- HERO -->
+      <div class="navitem" data-menu>
+        <a>Publisher <span class="ar">▾</span></a>
+        <div class="mega"><div class="mega-in">
+          <div class="mega-l"><div class="mt">Продвижение</div><h3>Publisher</h3>
+            <p>Один пост — сразу во ВКонтакте, Telegram, Instagram, MAX и Одноклассники. С живым превью.</p>
+            <div class="mega-links">
+              <a href="#eco"><span class="i">✦</span>Возможности</a>
+              <a href="#promos"><span class="i">▶</span>Смотреть ролик</a>
+              <a href="#pricing"><span class="i">₽</span>Тарифы</a>
+              <a href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe"><span class="i">↓</span>Скачать</a>
+            </div>
+          </div>
+          <div class="mega-r"><img src="img/promo/publisher_poster.jpg" alt=""></div>
+        </div></div>
+      </div>
+
+      <div class="navitem" data-menu>
+        <a>Биржа задач <span class="ar">▾</span></a>
+        <div class="mega"><div class="mega-in">
+          <div class="mega-l"><div class="mt">Подработка</div><h3>Биржа задач</h3>
+            <p>Заказчик и исполнитель находят друг друга. Безопасная сделка — деньги после результата.</p>
+            <div class="mega-links">
+              <a href="#eco"><span class="i">✦</span>Как устроено</a>
+              <a href="#promos"><span class="i">▶</span>Смотреть ролик</a>
+              <a href="#pricing"><span class="i">₽</span>Бесплатно</a>
+              <a href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe"><span class="i">↓</span>Скачать</a>
+            </div>
+          </div>
+          <div class="mega-r"><img src="img/promo/tasks_poster.jpg" alt=""></div>
+        </div></div>
+      </div>
+
+      <div class="navitem" data-menu>
+        <a>Ещё <span class="ar">▾</span></a>
+        <div class="mega"><div class="mega-in">
+          <div class="mega-l"><div class="mt">Экосистема</div><h3>Все инструменты</h3>
+            <p>Vacantrix — это растущая линейка. Скоро добавим лиды, мониторинг и аналитику.</p>
+            <div class="mega-links">
+              <a href="#eco"><span class="i">🟢</span>Авито-бот</a>
+              <a href="#eco"><span class="i">🖥</span>Platform</a>
+              <a href="#eco"><span class="i">🎯</span>Leads <span class="s">скоро</span></a>
+              <a href="#eco"><span class="i">📈</span>Monitor <span class="s">скоро</span></a>
+              <a href="#eco"><span class="i">📊</span>Analytics <span class="s">скоро</span></a>
+              <a href="#eco"><span class="i">👥</span>Группы <span class="s">скоро</span></a>
+            </div>
+          </div>
+          <div class="mega-r"><div class="mega-soon">Здесь будет витрина новинок</div></div>
+        </div></div>
+      </div>
+
+      <div class="navitem"><a href="#pricing">Цены</a></div>
+    </nav>
+
+    <span class="spacer"></span>
+    <div class="right">
+      <!-- РЕДАКТИРУЕМО: вход подключим позже -->
+      <a class="ghost" href="#">Войти</a>
+      <a class="btn btn-pri dl" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a>
+    </div>
+  </div>
+</header>
+
+<!-- ════════════════ B. HERO (видео-превью) ════════════════ -->
 <section class="hero"><div class="wrap">
-  <span class="eyebrow">Десктоп-инструменты для Windows</span>
+  <span class="eyebrow">Экосистема инструментов · Windows</span>
   <h1>Освободите своё <span class="gw">время</span> от рутины</h1>
-  <p class="sub">Vacantrix берёт на себя отклики на вакансии, публикации в соцсетях и поиск клиентов — пока вы занимаетесь тем, что действительно важно.</p>
+  <p class="sub">Отклики на вакансии, постинг в соцсети, поиск клиентов — связанные инструменты, которые работают за вас.</p>
   <div class="cta">
     <a class="btn btn-pri lg" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать бесплатно</a>
-    <a class="btn btn-gh lg" href="#time">Как это экономит время →</a>
+    <a class="btn btn-gh lg" href="#eco">Посмотреть экосистему →</a>
   </div>
-  <div class="trust"><span><span class="ok">✓</span> Бесплатный старт без карты</span><span><span class="ok">✓</span> Не просим ваши пароли</span><span><span class="ok">✓</span> Данные остаются на вашем ПК</span></div>
+  <!-- РЕДАКТИРУЕМО: hero-видео (замените img/promo/hero.mp4 на свой ролик) -->
+  <div class="hero-video">
+    <div class="frame-bar"><i></i><i></i><i></i></div>
+    <video autoplay muted loop playsinline preload="metadata" poster="img/promo/hero_poster.jpg">
+      <source src="img/promo/hero.mp4" type="video/mp4">
+    </video>
+  </div>
+</div></section>
 
-  <div class="device">
-    <div class="dv-bar"><div class="dots"><i></i><i></i><i></i></div><span class="ttl">Vacantrix · HH-бот</span><span class="saved">⏱ Сэкономлено сегодня: 2 ч 40 мин</span></div>
-    <div class="dv-body">
-      <div class="dv-side">
-        <div class="cap">Инструменты</div>
-        <div class="dv-row on"><span class="ic">💼</span>HH-бот</div>
-        <div class="dv-row"><span class="ic">🟢</span>Авито-бот</div>
-        <div class="dv-row"><span class="ic">📡</span>Publisher</div>
-        <div class="dv-row"><span class="ic">📋</span>Биржа задач</div>
-      </div>
-      <div class="dv-main">
-        <div class="dv-h"><span class="t">Отклики идут автоматически</span><span class="dv-pill">● Работает за вас</span></div>
-        <div class="log">
-          <div class="l"><span class="ck">✓</span>Отклик отправлен · Frontend-разработчик<span class="src">hh.ru</span></div>
-          <div class="l"><span class="ck">✓</span>Отклик отправлен · UI/UX дизайнер<span class="src">hh.ru</span></div>
-          <div class="l"><span class="ck">✓</span>Отклик отправлен · Продуктовый аналитик<span class="src">hh.ru</span></div>
-          <div class="l pend"><span class="ck">↻</span>Отправляю · Менеджер проектов<span class="src">hh.ru</span></div>
-        </div>
-        <div class="dv-prog"><i></i></div>
-        <div class="dv-cap">31 из 50 откликов · сопроводительное письмо добавлено автоматически — вы в это время заняты своими делами</div>
-      </div>
+<!-- ════════════════ C. ЭКОСИСТЕМА (узлы + паутина) ════════════════ -->
+<section class="sec eco-section" id="eco"><div class="wrap">
+  <div class="head"><span class="eyebrow">Связаны в одно</span><h2>Не набор приложений — единая экосистема</h2>
+    <p>Каждый инструмент решает свою задачу, но все они работают на одно: вернуть вам время. Один аккаунт, один лаунчер, общие данные.</p></div>
+
+  <div class="eco">
+    <!-- паутина: координаты линий совпадают с позициями узлов (.n-*) -->
+    <svg class="eco-web" viewBox="0 0 1000 620" preserveAspectRatio="none" aria-hidden="true">
+      <g class="ring">
+        <line class="lnk" x1="215" y1="165" x2="785" y2="165"></line>
+        <line class="lnk" x1="785" y1="165" x2="785" y2="455"></line>
+        <line class="lnk" x1="785" y1="455" x2="215" y2="455"></line>
+        <line class="lnk" x1="215" y1="455" x2="215" y2="165"></line>
+      </g>
+      <line class="lnk main" x1="500" y1="310" x2="500" y2="70"></line>
+      <line class="lnk main" x1="500" y1="310" x2="215" y2="165"></line>
+      <line class="lnk main" x1="500" y1="310" x2="785" y2="165"></line>
+      <line class="lnk main" x1="500" y1="310" x2="215" y2="455"></line>
+      <line class="lnk main" x1="500" y1="310" x2="785" y2="455"></line>
+      <line class="lnk faint" x1="500" y1="310" x2="90"  y2="310"></line>
+      <line class="lnk faint" x1="500" y1="310" x2="910" y2="310"></line>
+      <line class="lnk faint" x1="500" y1="310" x2="500" y2="560"></line>
+    </svg>
+
+    <!-- РЕДАКТИРУЕМО: узлы экосистемы. data-video → промо; data-soon → заглушка -->
+    <div class="node hub n-hub" data-name="Vacantrix" data-video="img/promo/vacantrix.mp4">
+      <div class="disc"><span class="d" style="font-size:0">V</span>✦</div>
+      <div class="nm">Vacantrix<small>обзор экосистемы</small></div>
     </div>
-  </div>
-</div></section>
-
-<!-- PAIN -->
-<section class="sec" id="pains"><div class="wrap">
-  <div class="head"><span class="eyebrow">Знакомая картина?</span><h2>Каждый день одни и те же действия съедают ваши часы</h2><p>Vacantrix забирает рутину себе — и возвращает вам время на жизнь, семью и работу, которая действительно важна.</p></div>
-  <div class="pains">
-    <div class="pain"><div class="ic">⏳</div><h3>Отклики вручную</h3><p>Открыть вакансию, прочитать, написать сопроводительное, отправить — и так десятки раз каждый день. Часы уходят впустую.</p><span class="relief">→ Бот откликается сам, по вашим правилам</span></div>
-    <div class="pain"><div class="ic">🔁</div><h3>Постинг в каждую сеть</h3><p>Один и тот же пост вы вручную копируете во ВКонтакте, Telegram, Instagram и ещё несколько мест. Каждый раз заново.</p><span class="relief">→ Один пост — сразу во все площадки</span></div>
-    <div class="pain"><div class="ic">🔎</div><h3>Поиск клиентов и данных</h3><p>Сбор контактов, мониторинг цен и проверка конкурентов забирают целые вечера, которые могли быть свободными.</p><span class="relief">→ Инструменты соберут за вас</span></div>
-  </div>
-</div></section>
-
-<!-- TIME -->
-<section class="sec" id="time" style="padding-top:0"><div class="wrap">
-  <div class="timeband">
-    <div>
-      <div class="big">до 40 часов<span class="u">в месяц — это целая рабочая неделя, которую вы тратили на рутину</span></div>
+    <div class="node n-platform" data-name="Platform" data-icon="img/platform_icon.png" data-video="img/promo/platform.mp4">
+      <div class="disc"><img src="img/platform_icon.png" alt="" onerror="this.replaceWith(document.createTextNode('🖥'))"><span class="play">▶</span></div>
+      <div class="nm">Platform<small>лаунчер-магазин</small></div>
     </div>
-    <div class="trow">
-      <div class="r"><span class="what">Отклики на вакансии</span><span class="old">2–3 ч в день</span><span class="new">7 минут настройки</span></div>
-      <div class="r"><span class="what">Публикация в 5 соцсетей</span><span class="old">40 мин на пост</span><span class="new">один клик</span></div>
-      <div class="r"><span class="what">Держать расписание в голове</span><span class="old">каждый день</span><span class="new">делает сам</span></div>
+    <div class="node n-hh soon" data-name="HH-бот" data-icon="img/hh_icon.png" data-soon="1">
+      <div class="disc"><img src="img/hh_icon.png" alt="" onerror="this.replaceWith(document.createTextNode('💼'))"></div>
+      <div class="nm">HH-бот<small>ролик скоро</small></div>
     </div>
+    <div class="node n-pub" data-name="Publisher" data-icon="img/publisher_icon.png" data-video="img/promo/publisher.mp4">
+      <div class="disc"><img src="img/publisher_icon.png" alt="" onerror="this.replaceWith(document.createTextNode('📡'))"><span class="play">▶</span></div>
+      <div class="nm">Publisher<small>кросс-постинг</small></div>
+    </div>
+    <div class="node n-tasks" data-name="Биржа задач" data-icon="img/tasks_icon.png" data-video="img/promo/tasks.mp4">
+      <div class="disc"><img src="img/tasks_icon.png" alt="" onerror="this.replaceWith(document.createTextNode('📋'))"><span class="play">▶</span></div>
+      <div class="nm">Биржа задач<small>подработка</small></div>
+    </div>
+    <div class="node n-avito soon" data-name="Авито-бот" data-icon="img/avito_icon.png" data-soon="1">
+      <div class="disc"><img src="img/avito_icon.png" alt="" onerror="this.replaceWith(document.createTextNode('🟢'))"></div>
+      <div class="nm">Авито-бот<small>ролик скоро</small></div>
+    </div>
+    <div class="node n-leads soon" data-name="Leads" data-soon="1"><div class="disc">🎯</div><div class="nm">Leads<small>скоро</small></div></div>
+    <div class="node n-monitor soon" data-name="Monitor" data-soon="1"><div class="disc">📈</div><div class="nm">Monitor<small>скоро</small></div></div>
+    <div class="node n-analytics soon" data-name="Analytics" data-soon="1"><div class="disc">📊</div><div class="nm">Analytics<small>скоро</small></div></div>
+  </div>
+  <div class="eco-hint">Нажмите на инструмент, чтобы посмотреть его промо-ролик</div>
+</div></section>
+
+<!-- ════════════════ D. ПРОМО-ПОЛОСА (видео инлайн) ════════════════ -->
+<section class="sec" id="promos" style="padding-top:0"><div class="wrap">
+  <div class="head"><span class="eyebrow">Смотрите вживую</span><h2>Как это выглядит в работе</h2></div>
+  <!-- РЕДАКТИРУЕМО: карточки-проролики -->
+  <div class="promos">
+    <div class="promo"><div class="v"><video controls muted preload="none" poster="img/promo/platform_poster.jpg"><source src="img/promo/platform.mp4" type="video/mp4"></video></div>
+      <div class="b"><div class="top"><span class="ico"><img src="img/platform_icon.png" onerror="this.parentNode.textContent='🖥'"></span><span class="nm">Platform</span><span class="badge live" style="margin-left:auto">Доступно</span></div>
+        <p>Все инструменты в одном окне — единый вход, обновления, подписка.</p>
+        <div class="ft"><span class="pr">Бесплатно</span><a class="btn btn-gh" style="height:34px;padding:0 14px;font-size:13px" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div></div></div>
+
+    <div class="promo"><div class="v"><video controls muted preload="none" poster="img/promo/publisher_poster.jpg"><source src="img/promo/publisher.mp4" type="video/mp4"></video></div>
+      <div class="b"><div class="top"><span class="ico"><img src="img/publisher_icon.png" onerror="this.parentNode.textContent='📡'"></span><span class="nm">Publisher</span><span class="badge live" style="margin-left:auto">Доступно</span></div>
+        <p>Один пост — сразу во все соцсети, с живым превью и расписанием.</p>
+        <div class="ft"><span class="pr">Free / Pro 299 ₽</span><a class="btn btn-gh" style="height:34px;padding:0 14px;font-size:13px" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div></div></div>
+
+    <div class="promo"><div class="v"><video controls muted preload="none" poster="img/promo/tasks_poster.jpg"><source src="img/promo/tasks.mp4" type="video/mp4"></video></div>
+      <div class="b"><div class="top"><span class="ico"><img src="img/tasks_icon.png" onerror="this.parentNode.textContent='📋'"></span><span class="nm">Биржа задач</span><span class="badge live" style="margin-left:auto">Доступно</span></div>
+        <p>Подработка рядом — безопасная сделка, рейтинги, чат в задаче.</p>
+        <div class="ft"><span class="pr">Бесплатно</span><a class="btn btn-gh" style="height:34px;padding:0 14px;font-size:13px" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div></div></div>
+
+    <!-- HH/Авито: проролика пока нет → заглушка (РЕДАКТИРУЕМО: вставьте видео, когда будет) -->
+    <div class="promo"><div class="v"><div class="ph">Промо-ролик HH-бота скоро<br>— добавим, как смонтируем</div></div>
+      <div class="b"><div class="top"><span class="ico"><img src="img/hh_icon.png" onerror="this.parentNode.textContent='💼'"></span><span class="nm">HH-бот</span><span class="badge live" style="margin-left:auto">Доступно</span></div>
+        <p>Откликается на вакансии hh.ru — без вас, по вашим фильтрам.</p>
+        <div class="ft"><span class="pr">от 299 ₽</span><a class="btn btn-gh" style="height:34px;padding:0 14px;font-size:13px" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div></div></div>
+
+    <div class="promo"><div class="v"><div class="ph">Промо-ролик Авито-бота скоро</div></div>
+      <div class="b"><div class="top"><span class="ico"><img src="img/avito_icon.png" onerror="this.parentNode.textContent='🟢'"></span><span class="nm">Авито-бот</span><span class="badge live" style="margin-left:auto">Доступно</span></div>
+        <p>Находит и откликается на вакансии Авито автоматически.</p>
+        <div class="ft"><span class="pr">от 299 ₽</span><a class="btn btn-gh" style="height:34px;padding:0 14px;font-size:13px" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div></div></div>
+
+    <!-- РЕДАКТИРУЕМО: добавьте сюда новые карточки приложений -->
+    <div class="promo" style="border-style:dashed;align-items:center;justify-content:center"><div class="b" style="text-align:center;padding:34px 18px;color:var(--tx3)"><div style="font-size:26px;margin-bottom:8px">＋</div>Здесь появится<br>следующий инструмент</div></div>
   </div>
 </div></section>
 
-<!-- STEPS -->
-<section class="sec" style="padding-top:0"><div class="wrap">
-  <div class="head"><span class="eyebrow">Как это работает</span><h2>Три шага — и время снова ваше</h2></div>
-  <div class="steps">
-    <div class="step"><div class="n">1</div><h3>Скачайте лаунчер</h3><p>Один файл для Windows, без установки. Открывается за 30 секунд.</p></div>
-    <div class="step"><div class="n">2</div><h3>Выберите инструмент</h3><p>HH-бот, Publisher, Биржа задач — каждый бесплатен для старта.</p></div>
-    <div class="step"><div class="n">3</div><h3>Настройте один раз</h3><p>Дальше он работает сам, а вы занимаетесь тем, что важно.</p></div>
-  </div>
-</div></section>
-
-<!-- TOOLS -->
-<section class="sec" id="tools" style="padding-top:0"><div class="wrap">
-  <div class="head"><span class="eyebrow">Инструменты</span><h2>Выберите, что отнимает у вас больше всего времени</h2></div>
-  <div class="tools">
-    <div class="tcard"><div class="top"><div class="ico"><img src="img/hh_icon.png" onerror="this.parentNode.textContent='💼'"></div><div><div class="nm">HH-бот</div><div class="cat">Поиск работы</div></div><span class="badge live">Доступно</span></div><p class="tg">Откликается на вакансии hh.ru — без вас.</p><div class="ft"><span class="pr">от 299 ₽ · старт бесплатно</span></div></div>
-    <div class="tcard"><div class="top"><div class="ico"><img src="img/avito_icon.png" onerror="this.parentNode.textContent='🟢'"></div><div><div class="nm">Авито-бот</div><div class="cat">Поиск работы</div></div><span class="badge live">Доступно</span></div><p class="tg">Находит и откликается на вакансии Авито.</p><div class="ft"><span class="pr">от 299 ₽ · старт бесплатно</span></div></div>
-    <div class="tcard"><div class="top"><div class="ico">📡</div><div><div class="nm">Publisher</div><div class="cat">Продвижение</div></div><span class="badge live">Доступно</span></div><p class="tg">Один пост — сразу во все соцсети.</p><div class="ft"><span class="pr">Free / Pro 299 ₽</span></div></div>
-    <div class="tcard"><div class="top"><div class="ico"><img src="img/tasks_icon.png" onerror="this.parentNode.textContent='📋'"></div><div><div class="nm">Биржа задач</div><div class="cat">Подработка</div></div><span class="badge live">Доступно</span></div><p class="tg">Подработка рядом — без посредников.</p><div class="ft"><span class="pr">Бесплатно</span></div></div>
-    <div class="tcard"><div class="top"><div class="ico">🎯</div><div><div class="nm">Leads</div><div class="cat">Лиды</div></div><span class="badge soon">Скоро</span></div><p class="tg">База клиентов из 2ГИС — за минуты.</p><div class="ft"><span class="pr soon">В разработке</span></div></div>
-    <div class="tcard"><div class="top"><div class="ico">📊</div><div><div class="nm">Analytics</div><div class="cat">Аналитика</div></div><span class="badge soon">Скоро</span></div><p class="tg">Цены конкурентов — всегда перед глазами.</p><div class="ft"><span class="pr soon">В разработке</span></div></div>
-  </div>
-</div></section>
-
-<!-- PRICING -->
+<!-- ════════════════ E. ЦЕННОСТЬ ════════════════ -->
 <section class="sec" id="pricing" style="padding-top:0"><div class="wrap">
-  <div class="head center"><span class="eyebrow">Цены</span><h2>Начните бесплатно. Платите, если время вернулось</h2></div>
-  <div class="plans">
-    <div class="plan"><span class="pn">Старт</span><div class="pa">0 ₽</div><div class="ps">Попробовать, не думая о деньгах.</div>
-      <ul><li>10 откликов в месяц</li><li>Базовый Publisher</li><li>Биржа задач целиком</li><li>Без карты</li></ul>
-      <a class="btn btn-gh" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div>
-    <div class="plan feat"><span class="pn">Рабочий <span class="star">★</span></span><div class="pa">299 <small>₽/мес</small></div><div class="ps">Для тех, у кого рутина каждый день.</div>
-      <ul><li>Безлимит откликов</li><li>Отложенные посты</li><li>Все площадки Publisher</li><li>Автообновления</li></ul>
-      <a class="btn btn-pri" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a></div>
-    <div class="plan"><span class="pn">Профи</span><div class="pa">599 <small>₽/мес</small></div><div class="ps">Максимум, чтобы не думать о рутине вообще.</div>
-      <ul><li>Всё из «Рабочий»</li><li>До 3 аккаунтов</li><li>Приоритетная поддержка</li><li>Ранний доступ к новинкам</li></ul>
-      <a class="btn btn-gh" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a></div>
+  <div class="head"><span class="eyebrow">Зачем это вам</span><h2>Экосистема возвращает ваше время</h2></div>
+  <!-- РЕДАКТИРУЕМО -->
+  <div class="value">
+    <div class="vcard"><div class="ic">⏱</div><h3>До 40 часов в месяц</h3><p>Столько уходит на ручные отклики и постинг. Инструменты забирают это себе.</p></div>
+    <div class="vcard"><div class="ic">🔗</div><h3>Всё связано</h3><p>Один вход, общий профиль и данные. Не пять разных программ, а одна система.</p></div>
+    <div class="vcard"><div class="ic">🎁</div><h3>Старт бесплатно</h3><p>Без карты и регистрации почты. Платите, только если время реально вернулось.</p></div>
   </div>
-</div></section>
-
-<!-- TRUST -->
-<section class="sec" style="padding-top:0"><div class="wrap">
-  <div class="trust-strip">
-    <div class="ts"><span class="e">🛡️</span><div><b>Без доступа к паролям</b><span>Мы не запрашиваем логины и пароли от ваших аккаунтов</span></div></div>
-    <div class="ts"><span class="e">💻</span><div><b>Данные у вас</b><span>Всё работает на вашем компьютере, локально</span></div></div>
-    <div class="ts"><span class="e">📦</span><div><b>Открытые релизы</b><span>Сборки публикуются на GitHub — можно проверить</span></div></div>
-    <div class="ts"><span class="e">💳</span><div><b>Бесплатно без карты</b><span>Платите, только когда сами захотите</span></div></div>
-  </div>
-</div></section>
-
-<!-- FINAL -->
-<section class="sec" style="padding-top:0"><div class="wrap">
-  <div class="final">
-    <h2>Сколько часов вы вернёте себе уже на этой неделе?</h2>
-    <p>Скачайте лаунчер и запустите первый инструмент за пару минут.</p>
+  <div style="text-align:center;margin-top:34px">
     <a class="btn btn-pri lg" href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать Vacantrix — бесплатно</a>
-    <div class="sub">Windows 10/11 · без установки</div>
+    <div style="color:var(--tx3);font-size:13px;margin-top:12px">Windows 10/11 · без установки</div>
   </div>
 </div></section>
 
-<!-- FOOTER -->
+<!-- ════════════════ F. ФУТЕР-«ЛЕГЕНДА» ════════════════ -->
 <footer class="foot">
-  <div class="wrap">
-    <div><div class="brand"><span class="d"></span>Vacantrix</div><p class="about">Инструменты, которые работают — пока вы заняты важным.</p></div>
-    <div class="col"><h4>Продукт</h4><a href="#tools">Инструменты</a><a href="#pricing">Цены</a><a href="https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixLauncher.exe">Скачать</a></div>
-    <div class="col"><h4>Инструменты</h4><a href="#tools">HH-бот</a><a href="#tools">Авито-бот</a><a href="#tools">Publisher</a><a href="#tools">Биржа задач</a></div>
-    <div class="col"><h4>Поддержка</h4><a href="https://t.me/VacantrixB_O_T" target="_blank">Telegram</a><a href="terms.html">Соглашение</a></div>
+  <div class="foot-top">
+    <div>
+      <div class="brand"><span class="d"></span>Vacantrix</div>
+      <p class="about">Единая экосистема инструментов, которые работают — пока вы заняты важным.</p>
+      <!-- РЕДАКТИРУЕМО: соцсети/каналы -->
+      <div class="social"><a href="https://t.me/VacantrixB_O_T" target="_blank" title="Telegram">✈</a><a href="#" title="ВКонтакте">в</a><a href="#" title="GitHub">⌂</a></div>
+    </div>
+    <div class="col"><h4>Продукты</h4>
+      <a href="#eco">HH-бот</a><a href="#eco">Авито-бот</a><a href="#eco">Publisher</a><a href="#eco">Биржа задач</a><a href="#eco">Platform</a>
+    </div>
+    <div class="col"><h4>Скоро</h4>
+      <a href="#eco">Leads <span class="s">скоро</span></a><a href="#eco">Monitor <span class="s">скоро</span></a><a href="#eco">Analytics <span class="s">скоро</span></a><a href="#eco">Группы <span class="s">скоро</span></a>
+    </div>
+    <div class="col"><h4>Ресурсы</h4>
+      <!-- РЕДАКТИРУЕМО: ссылки наполните позже -->
+      <a href="#eco">Как это работает</a><a href="#promos">Видео</a><a href="#pricing">Цены</a><a href="#">FAQ</a><a href="#">Что нового</a>
+    </div>
+    <div class="col"><h4>Документы</h4>
+      <a href="terms.html">Пользовательское соглашение</a><a href="privacy.html">Политика конфиденциальности</a><a href="terms.html">Оферта</a>
+      <a href="https://t.me/VacantrixB_O_T" target="_blank">Поддержка</a>
+    </div>
   </div>
-  <div class="bot"><span>© 2026 Vacantrix</span><a href="terms.html" style="color:var(--tx3)">Пользовательское соглашение</a></div>
+  <div class="foot-bot"><div class="in">
+    <span>© 2026 Vacantrix. Все права защищены.</span>
+    <span class="lks"><a href="terms.html">Соглашение</a><a href="privacy.html">Конфиденциальность</a><a href="https://t.me/VacantrixB_O_T" target="_blank">Telegram</a></span>
+  </div></div>
 </footer>
 
+<!-- ════════════════ Лайтбокс промо ════════════════ -->
+<div class="lb" id="lb">
+  <div class="lb-box">
+    <div class="bar2"><span class="ic" id="lbIco"></span><span class="nm" id="lbName"></span><button class="x" id="lbX" aria-label="Закрыть">✕</button></div>
+    <div class="lb-media" id="lbMedia"></div>
+  </div>
+</div>
+
+<script>
+// ── Мега-меню: hover на десктопе (CSS) + клик/тач ──
+document.querySelectorAll('.navitem[data-menu]>a').forEach(a=>{
+  a.addEventListener('click',e=>{
+    e.preventDefault();
+    const it=a.parentElement, was=it.classList.contains('open');
+    document.querySelectorAll('.navitem.open').forEach(o=>o.classList.remove('open'));
+    if(!was) it.classList.add('open');
+  });
+});
+document.addEventListener('click',e=>{ if(!e.target.closest('.navitem')) document.querySelectorAll('.navitem.open').forEach(o=>o.classList.remove('open')); });
+
+// ── Лайтбокс промо-роликов из узлов экосистемы ──
+const lb=document.getElementById('lb'), lbMedia=document.getElementById('lbMedia'),
+      lbName=document.getElementById('lbName'), lbIco=document.getElementById('lbIco');
+function openLB(node){
+  const name=node.dataset.name||'', video=node.dataset.video, icon=node.dataset.icon, soon=node.dataset.soon;
+  lbName.textContent=name;
+  lbIco.innerHTML = icon ? '<img src="'+icon+'" alt="">' : '✦';
+  if(video){
+    lbMedia.innerHTML='<video controls autoplay playsinline src="'+video+'"></video>';
+  } else {
+    lbMedia.innerHTML='<div class="soon">'+(icon?'<img src="'+icon+'" alt="">':'')+'<div>Промо-ролик скоро</div></div>';
+  }
+  lb.classList.add('on');
+}
+function closeLB(){ lb.classList.remove('on'); lbMedia.innerHTML=''; }
+document.querySelectorAll('.node').forEach(n=> n.addEventListener('click',()=>openLB(n)));
+document.getElementById('lbX').addEventListener('click',closeLB);
+lb.addEventListener('click',e=>{ if(e.target===lb) closeLB(); });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeLB(); });
+</script>
 </body>
 </html>
