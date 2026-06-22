@@ -9,11 +9,11 @@
   --bg2:       #0f0a0f;
   --glass:     rgba(18, 10, 18, 0.82);
   --glass2:    rgba(28, 16, 28, 0.70);
-  --accent:    #c41c1c;
-  --accent-b:  #ff4444;
-  --accent-d:  #8a0f0f;
-  --border:    rgba(200, 25, 25, 0.20);
-  --border2:   rgba(200, 25, 25, 0.08);
+  --accent:    #e63946;
+  --accent-b:  #ff5a67;
+  --accent-d:  #a4161a;
+  --border:    rgba(230, 57, 70, 0.22);
+  --border2:   rgba(230, 57, 70, 0.08);
   --text:      #f0f0f8;
   --text2:     #9090b0;
   --text3:     #505070;
@@ -94,6 +94,32 @@ a { color: inherit; text-decoration: none; }
 }
 .navbar-actions { display: flex; align-items: center; gap: 10px; }
 #user-info { font-size: 13px; color: var(--text2); }
+
+/* ── Чип пользователя + аватар ──────────────────────────────────────── */
+.user-chip { display: inline-flex; align-items: center; gap: 8px; }
+
+.avatar {
+  position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent, #c41c1c), var(--accent-b, #ff4444));
+  color: #fff; font-weight: 700; text-transform: uppercase;
+  user-select: none;
+}
+.avatar img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
+.avatar img.hidden { display: none; }
+.avatar-fallback { line-height: 1; }
+.avatar-fallback.hidden { display: none; }
+
+.avatar-sm { width: 28px; height: 28px; font-size: 13px; }
+.avatar-lg { width: 44px; height: 44px; font-size: 20px; }
 
 /* ── Кнопки ────────────────────────────────────────────────────────── */
 .btn-primary, .btn-outline, .btn-store, .btn-danger, .btn-ghost {
