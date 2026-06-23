@@ -22,18 +22,56 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const _PLATFORM_URL = 'https://github.com/vacantrix/vacantrix-platform-dist/releases/latest/download/VacantrixSetup.exe';
 
+  // ── Аватар ──────────────────────────────────────────────────────────
+  // Первая буква имени/почты для заглушки, когда нет картинки.
+  function _initial(label) {
+    const s = String(label || '').trim();
+    return s ? s[0].toUpperCase() : '?';
+  }
+
+  // Рендерит круглый аватар в контейнер: <img> при наличии avatar_url
+  // (object-fit:cover задаётся в CSS), иначе/при ошибке загрузки — инициал.
+  // url уже содержит кэш-бастер ?v= (пишет платформа) — используем как есть.
+  function _renderAvatar(imgEl, fallbackEl, url, label) {
+    if (!imgEl || !fallbackEl) return;
+    fallbackEl.textContent = _initial(label);
+    if (url) {
+      imgEl.onerror = () => {           // битая/недоступная картинка → заглушка
+        imgEl.classList.add('hidden');
+        fallbackEl.classList.remove('hidden');
+      };
+      imgEl.onload = () => {
+        imgEl.classList.remove('hidden');
+        fallbackEl.classList.add('hidden');
+      };
+      // hidden до onload, чтобы не мелькала «сломанная картинка»
+      imgEl.classList.add('hidden');
+      fallbackEl.classList.remove('hidden');
+      imgEl.src = url;
+    } else {
+      imgEl.removeAttribute('src');
+      imgEl.classList.add('hidden');
+      fallbackEl.classList.remove('hidden');
+    }
+  }
+
   // ── Navbar ────────────────────────────────────────────────────────────
   function _updateNavbar(user, isAdmin) {
     document.getElementById('btn-login') ?.classList.toggle('hidden', !!user);
     document.getElementById('btn-logout')?.classList.toggle('hidden', !user);
     document.getElementById('btn-admin') ?.classList.toggle('hidden', !isAdmin);
-    const ui = document.getElementById('user-info');
-    if (ui) {
-      // Показываем display_name если есть, иначе email
-      const label = user ? (Profile.displayName() || user.email) : '';
-      ui.textContent = label;
-      ui.classList.toggle('hidden', !user);
-    }
+    const ui   = document.getElementById('user-info');
+    const chip = document.getElementById('user-chip');
+    // Показываем display_name если есть, иначе email
+    const label = user ? (Profile.displayName() || user.email) : '';
+    if (ui) ui.textContent = label;
+    if (chip) chip.classList.toggle('hidden', !user);
+    _renderAvatar(
+      document.getElementById('nav-avatar-img'),
+      document.getElementById('nav-avatar-fallback'),
+      user ? Profile.avatarUrl() : null,
+      label,
+    );
   }
 
   // ── Hero-кнопка скачивания ─────────────────────────────────────────
@@ -98,7 +136,13 @@ document.addEventListener('DOMContentLoaded', () => {
       // ── Карточка «Профиль» ────────────────────────────────────────────
       const profileCard = `
         <div class="settings-card reveal">
-          <div class="settings-card-header"><span class="settings-icon">👤</span><h3>Профиль</h3></div>
+          <div class="settings-card-header">
+            <span id="settings-avatar" class="avatar avatar-lg">
+              <img id="settings-avatar-img" alt="" class="hidden">
+              <span id="settings-avatar-fallback" class="avatar-fallback"></span>
+            </span>
+            <h3>Профиль</h3>
+          </div>
           ${dispName ? `
           <div class="settings-item">
             <span class="settings-label">Ник</span>
@@ -182,6 +226,14 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>`;
 
       container.innerHTML = `<div class="settings-grid">${profileCard}${appsCard}${secCard}</div>`;
+
+      // Аватар в карточке профиля (рендерим после вставки разметки).
+      _renderAvatar(
+        document.getElementById('settings-avatar-img'),
+        document.getElementById('settings-avatar-fallback'),
+        Profile.avatarUrl(),
+        dispName || user.email,
+      );
 
       // ── Обработчики ───────────────────────────────────────────────────
       document.getElementById('btn-change-pwd')?.addEventListener('click', () => {

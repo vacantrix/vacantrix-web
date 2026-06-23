@@ -1,6 +1,8 @@
 // =====================================================================
 // Конфигурация Supabase — заполните своими значениями из Supabase Dashboard
 // Project Settings → API
+// ⚠️ ТОЧКА ПЕРЕПОИНТА при миграции на self-host (Timeweb): сменить URL+ANON
+//    здесь (единственное место для сайта). См. MIGRATION_TIMEWEB.md.
 // =====================================================================
 const SUPABASE_URL  = 'https://fgcffgfyehequucnxegb.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnY2ZmZ2Z5ZWhlcXV1Y254ZWdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0ODYyMzAsImV4cCI6MjA5NDA2MjIzMH0.GrhRo_rrmpct1-gCPjznsbj4OE2Y3aWu8Q8n5rmo8Ec';

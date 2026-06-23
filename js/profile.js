@@ -11,7 +11,7 @@ const Profile = (() => {
     try {
       const { data, error } = await db
         .from('vx_profiles')
-        .select('id, display_name, hh_username, avito_username, hh_applicant_id, avito_user_id, subscription_expire')
+        .select('id, display_name, hh_username, avito_username, hh_applicant_id, avito_user_id, subscription_expire, avatar_url')
         .eq('web_user_id', webUserId)
         .maybeSingle();
       if (error) throw error;
@@ -78,6 +78,14 @@ const Profile = (() => {
   function current()     { return _data; }
   function displayName() { return _data?.display_name || _data?.hh_username || _data?.avito_username || ''; }
 
+  // ── Аватар ────────────────────────────────────────────────────────────
+  // avatar_url пишет платформа: полный публичный URL bucket 'avatars' с уже
+  // вшитым кэш-бастером (?v=...). Пустая строка трактуется как «нет аватара».
+  function avatarUrl() {
+    const u = _data?.avatar_url;
+    return (u && u.trim()) ? u : null;
+  }
+
   // ── Форматирование даты подписки ──────────────────────────────────────
   function subscriptionText() {
     if (!_data?.subscription_expire) return null;
@@ -89,5 +97,5 @@ const Profile = (() => {
     return { active: true, text: `Активна до ${dateStr}`, days };
   }
 
-  return { load, linkHH, linkAvito, setDisplayName, unlink, current, displayName, subscriptionText };
+  return { load, linkHH, linkAvito, setDisplayName, unlink, current, displayName, avatarUrl, subscriptionText };
 })();

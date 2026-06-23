@@ -10,6 +10,16 @@
   <script>document.write('<link rel="stylesheet" href="css/main.css?v=' + Date.now() + '">');</script>
   <noscript><link rel="stylesheet" href="css/main.css"></noscript>
 
+  <!-- Three.js (ESM) для 3D-интро. Import map должен идти ДО любого module-скрипта. -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
   <!-- ── Стили интро-сцены и новой верхней панели (компонентные, поверх main.css) ── -->
   <style>
   /* блокировка скролла на время интро */
@@ -20,10 +30,20 @@
     display: flex; align-items: center; gap: 6px; height: 56px; padding: 0 20px;
     background: var(--glass); backdrop-filter: var(--blur);
     border-bottom: 1px solid var(--border2); }
-  .tp-brand { display: flex; align-items: center; gap: 9px; font-size: 18px; font-weight: 800;
-    letter-spacing: .04em; margin-right: 10px; cursor: pointer;
-    background: linear-gradient(90deg, #fff 30%, var(--accent-b));
-    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .tp-brand { display: inline-block; font-size: 18px; font-weight: 800;
+    letter-spacing: .04em; margin-right: 10px; cursor: pointer; color: #f5f5fa; }
+  .tp-brand span { display: inline-block; }   /* каждая буква — для прыжка */
+  @keyframes brandHop { 0%, 100% { transform: translateY(0); } 42% { transform: translateY(-7px); } }
+  .tp-brand:hover span { animation: brandHop .42s ease; }
+  .tp-brand:hover span:nth-child(1) { animation-delay: 0s; }
+  .tp-brand:hover span:nth-child(2) { animation-delay: .05s; }
+  .tp-brand:hover span:nth-child(3) { animation-delay: .10s; }
+  .tp-brand:hover span:nth-child(4) { animation-delay: .15s; }
+  .tp-brand:hover span:nth-child(5) { animation-delay: .20s; }
+  .tp-brand:hover span:nth-child(6) { animation-delay: .25s; }
+  .tp-brand:hover span:nth-child(7) { animation-delay: .30s; }
+  .tp-brand:hover span:nth-child(8) { animation-delay: .35s; }
+  .tp-brand:hover span:nth-child(9) { animation-delay: .40s; }
   .tp-prods { display: flex; align-items: center; gap: 2px; }
   .tp-prod { width: 34px; height: 34px; border-radius: 9px; border: 1px solid transparent;
     background: transparent; display: grid; place-items: center; cursor: pointer; padding: 0;
@@ -57,6 +77,11 @@
   #intro-canvas { position: fixed; inset: 0; z-index: 1001; pointer-events: none;
     opacity: 1; transition: opacity .6s ease; }
   #intro-canvas.done { opacity: 0; }
+  /* после интро канвас становится ПОСТОЯННЫМ живым фоном (за контентом) */
+  #intro-canvas.bg { z-index: 0; opacity: 1; transition: opacity 1.4s ease; }
+  /* контент — над фоном-канвасом */
+  .main-content { position: relative; z-index: 1; }
+  #global-info { position: relative; z-index: 1; }
   #intro-skip { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 1300;
     display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border-radius: 999px;
     background: rgba(20,12,18,.7); border: 1px solid var(--border); color: var(--text2);
@@ -109,7 +134,7 @@
   .eco-node.is-soon.shown { opacity: .82; }
   .eco-node.is-soon .ico { filter: grayscale(.4) brightness(.85); }
 
-  /* радиальные позиции узлов (совпадают с тем, что измеряет intro.js) */
+  /* радиальные позиции узлов (DOM-карточки; 3D-интро рисуется поверх в intro3d.js) */
   .n-hh        { left: 50%; top: 12%; }
   .n-avito     { left: 84%; top: 33%; }
   .n-tasks     { left: 16%; top: 33%; }
@@ -138,6 +163,148 @@
     .eco-node { transform: translate(-50%,-50%) !important; }
     @media (max-width: 760px) { .eco-core, .eco-node { transform: none !important; } }
   }
+
+  /* ── Главная фича: планеты вместо карточек-плиток ──
+     Когда активна 3D-сцена (body.planets-on) — плитки eco-stage скрыты, а инфо
+     показывается по наведению на планету (#planet-card). В fallback (reduced-motion
+     / нет WebGL) класс НЕ ставится → плитки остаются обычным каталогом. */
+  /* Плитки eco-stage держим в DOM как источник данных (ховер-карточка + SEO), но прячем. */
+  body.planets-on .eco-stage { display: none; }
+
+  /* ── Раскладка «герой-планеты + текст в секциях ниже» ──
+     Сверху — чистый экран с планетами (прозрачно). Ниже — текст на СПЛОШНОМ фоне
+     (планеты за ним не просвечивают). Планеты видны только в герое главной. */
+  .planet-hero { position: relative; min-height: 86vh; width: 100vw; margin-left: calc(50% - 50vw);
+    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 24px; }
+  body:not(.planets-on) .planet-hero { display: none; }   /* нет 3D → нет пустого героя */
+  .scroll-cue { color: #fff; font-size: 14px; font-weight: 700; letter-spacing: .05em;
+    text-align: center; opacity: 1; animation: cueBob 1.6s ease-in-out infinite;
+    text-shadow: 0 0 10px rgba(230,57,70,.95), 0 0 22px rgba(230,57,70,.6); }
+  @keyframes cueBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(7px); } }
+
+  /* сплошная секция во всю ширину (full-bleed), контент по центру ~900px */
+  .home-content { position: relative; width: 100vw; margin-left: calc(50% - 50vw);
+    background: var(--bg); text-align: center;
+    padding: 52px max(20px, calc(50vw - 450px)) 40px; }
+  .home-content::before { content: ''; position: absolute; left: 0; right: 0; top: -70px;
+    height: 70px; background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none; }
+
+  /* остальные вкладки — тоже на сплошном фоне (планеты живут только в герое главной) */
+  body.planets-on .tab-panel:not(#tab-home) { position: relative; width: 100vw;
+    margin-left: calc(50% - 50vw); background: var(--bg); min-height: 78vh;
+    padding: 26px max(20px, calc(50vw - 450px)) 60px; }
+
+  body.planets-on .site-footer { position: relative; background: var(--bg); }
+
+  #planet-card { position: fixed; z-index: 1250; left: 0; top: 0; width: 232px; pointer-events: none;
+    background: var(--glass); border: 1px solid var(--accent); border-radius: 16px; padding: 14px;
+    box-shadow: 0 18px 50px -14px rgba(0,0,0,.8), 0 0 0 1px rgba(230,57,70,.28), 0 0 26px -6px rgba(230,57,70,.5);
+    backdrop-filter: var(--blur);
+    opacity: 0; transform: translateY(8px) scale(.96); transform-origin: left top;
+    transition: opacity .18s ease, transform .18s ease; }
+  #planet-card.show { opacity: 1; transform: translateY(0) scale(1); }
+  #planet-card .pc-top { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  #planet-card .pc-ico { width: 42px; height: 42px; border-radius: 11px; overflow: hidden; flex-shrink: 0;
+    background: linear-gradient(140deg, rgba(230,57,70,.18), rgba(0,0,0,.3)); border: 1px solid var(--border2);
+    display: grid; place-items: center; }
+  #planet-card .pc-ico img { width: 100%; height: 100%; object-fit: cover; }
+  #planet-card .pc-nm { font-size: 15px; font-weight: 700; line-height: 1.2; }
+  #planet-card .pc-sub { color: var(--text2); font-size: 11.5px; margin-top: 1px; }
+  #planet-card .pc-desc { color: var(--text2); font-size: 12.5px; line-height: 1.5; margin: 2px 0 11px; }
+  #planet-card .pc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  #planet-card .pc-badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
+  #planet-card .pc-badge.live { color: #58e08a; background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3); }
+  #planet-card .pc-badge.soon { color: var(--text3); background: rgba(255,255,255,.05); border: 1px solid var(--border2); }
+  #planet-card .pc-cta { font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-d)); border-radius: 8px; padding: 6px 12px; }
+
+  /* Детальная рамка приложения (focus-режим по клику) */
+  #planet-detail { position: fixed; z-index: 1300; right: max(24px, 5vw); top: 50%;
+    transform: translateY(-50%) translateX(34px); width: 340px; max-width: calc(100vw - 32px);
+    background: var(--glass); border: 1px solid var(--accent); border-radius: 20px; padding: 24px;
+    box-shadow: 0 24px 70px -18px rgba(0,0,0,.85), 0 0 0 1px rgba(230,57,70,.3), 0 0 40px -8px rgba(230,57,70,.5);
+    backdrop-filter: var(--blur); opacity: 0; pointer-events: none;
+    transition: opacity .35s ease, transform .35s ease; }
+  #planet-detail.show { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; }
+  #pd-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text2); cursor: pointer; font-size: 14px; }
+  #pd-close:hover { color: #fff; border-color: var(--accent-b); }
+  .pd-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding-right: 28px; }
+  .pd-ico { width: 64px; height: 64px; border-radius: 16px; overflow: hidden; flex-shrink: 0;
+    background: linear-gradient(140deg, rgba(230,57,70,.2), rgba(0,0,0,.3)); border: 1px solid var(--border2); display: grid; place-items: center; }
+  .pd-ico img { width: 100%; height: 100%; object-fit: cover; }
+  .pd-nm { font-size: 21px; font-weight: 800; line-height: 1.15; }
+  .pd-badge { display: inline-block; margin-top: 7px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 6px; }
+  .pd-badge.live { color: #58e08a; background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3); }
+  .pd-badge.soon { color: var(--text3); background: rgba(255,255,255,.05); border: 1px solid var(--border2); }
+  .pd-desc { color: var(--text2); font-size: 14.5px; line-height: 1.6; margin-bottom: 20px; }
+  .pd-cta { width: 100%; padding: 13px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; color: #fff; cursor: pointer; font-family: inherit;
+    background: linear-gradient(135deg, var(--accent), var(--accent-d)); box-shadow: 0 8px 28px -6px rgba(230,57,70,.6); }
+  .pd-cta:hover { filter: brightness(1.08); }
+
+  /* ══════════ Топбар: 5 вкладок с кастомными иконками и анимациями ══════════ */
+  .tp-tabs { display: flex; align-items: center; gap: 2px; margin-left: 16px; }
+  .tp-tab { position: relative; display: inline-flex; align-items: center; gap: 8px;
+    background: transparent; border: none; color: var(--text2); font-family: inherit;
+    font-size: 14px; font-weight: 600; padding: 9px 13px; border-radius: 11px; cursor: pointer;
+    transition: color .2s ease, background .2s ease; }
+  .tp-tab:hover { color: var(--text); background: rgba(255,255,255,.05); }
+  .tp-tab.active { color: var(--accent-b); }
+  .tp-ic { width: 20px; height: 20px; display: inline-grid; place-items: center; flex-shrink: 0;
+    transition: transform .25s ease, filter .25s ease; }
+  .tp-ic svg { width: 100%; height: 100%; overflow: visible; }
+  .tp-tab:hover .tp-ic { transform: scale(1.12); filter: drop-shadow(0 0 6px rgba(230,57,70,.85)); }
+  .tp-tab.active .tp-ic { filter: drop-shadow(0 0 7px rgba(230,57,70,.95)); }
+  /* индикатор-подчёркивание (выезжает из центра) */
+  .tp-tab::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 4px; height: 2px;
+    border-radius: 2px; background: linear-gradient(90deg, var(--accent), var(--accent-b));
+    transform: scaleX(0); transform-origin: center; transition: transform .26s cubic-bezier(.5,1.6,.5,1);
+    box-shadow: 0 0 8px rgba(230,57,70,.85); }
+  .tp-tab:hover::after, .tp-tab.active::after { transform: scaleX(1); }
+
+  /* пер-иконочные микро-анимации на hover */
+  .tp-ic [class^="a"] { transform-box: fill-box; transform-origin: center; }
+  @keyframes tpApulse { 0%,100% { transform: scale(1); } 45% { transform: scale(.62); } }
+  .tp-tab:hover .a1 { animation: tpApulse .55s ease; }
+  .tp-tab:hover .a2 { animation: tpApulse .55s ease .07s; }
+  .tp-tab:hover .a3 { animation: tpApulse .55s ease .21s; }
+  .tp-tab:hover .a4 { animation: tpApulse .55s ease .14s; }
+  .tag, .tagdot, .dot, .r1, .r2 { transform-box: fill-box; transform-origin: center; }
+  @keyframes tpSwing { 0%,100% { transform: rotate(0); } 30% { transform: rotate(-13deg); } 65% { transform: rotate(7deg); } }
+  .tp-tab:hover .tag { animation: tpSwing .6s ease; transform-origin: 78% 22%; }
+  @keyframes tpDot { 0%,100% { transform: scale(1); } 50% { transform: scale(1.9); } }
+  .tp-tab:hover .dot { animation: tpDot .55s ease; }
+  @keyframes tpMergeL { 0%,100% { transform: translateX(0); } 50% { transform: translateX(2.2px); } }
+  @keyframes tpMergeR { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-2.2px); } }
+  .tp-tab:hover .r1 { animation: tpMergeL .5s ease; }
+  .tp-tab:hover .r2 { animation: tpMergeR .5s ease; }
+  @keyframes tpBob { 0%,100% { transform: translateY(0) scale(1.12); } 50% { transform: translateY(-2.5px) scale(1.12); } }
+  .tp-tab:hover .tp-ic-bob { animation: tpBob .6s ease; }
+
+  @media (max-width: 920px) {
+    .tp-tabs { margin-left: 8px; gap: 0; overflow-x: auto; scrollbar-width: none; }
+    .tp-tabs::-webkit-scrollbar { display: none; }
+    .tp-lbl { display: none; }                 /* на узких — только иконки */
+    .tp-tab { padding: 9px 10px; }
+  }
+
+  /* ══════════ Секции «О нас / Поддержка / Сотрудничество» ══════════ */
+  .sec-head { text-align: center; margin: 6px auto 30px; max-width: 640px; }
+  .sec-head h2 { font-size: clamp(24px, 3.6vw, 34px); font-weight: 900; margin-bottom: 10px;
+    background: linear-gradient(120deg, #fff 38%, var(--accent-b)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .sec-head p { color: var(--text2); font-size: 15px; line-height: 1.6; }
+  .info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; max-width: 980px; margin: 0 auto; }
+  .info-card { display: block; text-align: left; background: var(--glass); border: 1px solid var(--border2);
+    border-radius: 16px; padding: 22px; color: inherit; text-decoration: none;
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+  .info-card:hover { transform: translateY(-4px); border-color: var(--accent);
+    box-shadow: 0 16px 40px -14px rgba(0,0,0,.6), 0 0 0 1px rgba(230,57,70,.22); }
+  .info-card .ic-ic { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 13px;
+    background: linear-gradient(140deg, rgba(230,57,70,.2), rgba(0,0,0,.25)); border: 1px solid var(--border2); color: var(--accent-b); }
+  .info-card .ic-ic svg { width: 22px; height: 22px; }
+  .info-card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; }
+  .info-card p { color: var(--text2); font-size: 13.5px; line-height: 1.55; }
+  .ic-cta { display: inline-block; margin-top: 13px; color: var(--accent-b); font-weight: 700; font-size: 13px; }
+  @media (max-width: 760px) { .info-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -150,31 +317,34 @@
 <!-- ════════════════ A. ВЕРХНЯЯ ПАНЕЛЬ ПРОДУКТОВ ════════════════ -->
 <!-- РЕДАКТИРУЕМО: набор продуктов-иконок и пунктов меню -->
 <header class="topbar">
-  <span class="tp-brand tab-btn" data-tab="home">Vacantrix</span>
+  <span class="tp-brand tab-btn" data-tab="home"><span>V</span><span>a</span><span>c</span><span>a</span><span>n</span><span>t</span><span>r</span><span>i</span><span>x</span></span>
 
-  <div class="tp-prods">
-    <button class="tp-prod tab-btn" data-tab="home" title="HH-бот"><img src="img/hh_icon.png" alt="HH-бот" onerror="this.outerHTML='<span class=ph>💼</span>'"></button>
-    <button class="tp-prod tab-btn" data-tab="home" title="Авито-бот"><img src="img/avito_icon.png" alt="Авито-бот" onerror="this.outerHTML='<span class=ph>🟢</span>'"></button>
-    <button class="tp-prod tab-btn" data-tab="home" title="Биржа задач"><img src="img/tasks_icon.png" alt="Биржа задач" onerror="this.outerHTML='<span class=ph>📋</span>'"></button>
-    <button class="tp-prod tab-btn" data-tab="home" title="Publisher · скоро"><span class="ph">📡</span></button>
-  </div>
-
-  <nav class="tp-nav">
-    <div class="tp-more">
-      <button class="tp-link tp-more-btn">Ещё</button>
-      <div class="tp-drop">
-        <!-- эти кнопки — те же .tab-btn, что и раньше: main.js переключает панели без изменений -->
-        <button class="tp-drop-item tab-btn" data-tab="apps"><span class="di">🧩</span>Приложения</button>
-        <button class="tp-drop-item tab-btn" data-tab="platforms"><span class="di">📡</span>Площадки</button>
-        <button class="tp-drop-item tab-btn" data-tab="settings"><span class="di">⚙</span>Настройки</button>
-      </div>
-    </div>
-    <button class="tp-link tab-btn" data-tab="pricing">Цены</button>
+  <nav class="tp-tabs">
+    <button class="tp-tab tab-btn" data-tab="apps">
+      <span class="tp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect class="a1" x="3" y="3" width="7.5" height="7.5" rx="2.2"/><rect class="a2" x="13.5" y="3" width="7.5" height="7.5" rx="2.2"/><rect class="a3" x="3" y="13.5" width="7.5" height="7.5" rx="2.2"/><rect class="a4" x="13.5" y="13.5" width="7.5" height="7.5" rx="2.2"/></svg></span>
+      <span class="tp-lbl">Приложения</span>
+    </button>
+    <button class="tp-tab tab-btn" data-tab="pricing">
+      <span class="tp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="tag" d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle class="tagdot" cx="7.3" cy="7.3" r="1.4" fill="currentColor" stroke="none"/></svg></span>
+      <span class="tp-lbl">Тарифы</span>
+    </button>
+    <button class="tp-tab tab-btn" data-tab="about">
+      <span class="tp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/><line x1="12" y1="11" x2="12" y2="16.5"/><circle class="dot" cx="12" cy="7.4" r="1.1" fill="currentColor" stroke="none"/></svg></span>
+      <span class="tp-lbl">О нас</span>
+    </button>
+    <button class="tp-tab tab-btn" data-tab="support">
+      <span class="tp-ic tp-ic-bob"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13.5v-1.5a8 8 0 0 1 16 0v1.5"/><rect x="2.4" y="13" width="4" height="7" rx="2"/><rect x="17.6" y="13" width="4" height="7" rx="2"/><path d="M20 19.6a4.6 4.6 0 0 1-4.6 3.2H13"/></svg></span>
+      <span class="tp-lbl">Поддержка</span>
+    </button>
+    <button class="tp-tab tab-btn" data-tab="partner">
+      <span class="tp-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle class="r1" cx="9" cy="12" r="5.4"/><circle class="r2" cx="15" cy="12" r="5.4"/></svg></span>
+      <span class="tp-lbl">Сотрудничество</span>
+    </button>
   </nav>
 
   <!-- Действия входа/профиля — DOM сохранён 1:1, чтобы auth.js/main.js работали без правок -->
   <div class="navbar-actions tp-actions">
-    <span id="user-chip" class="user-chip hidden">
+    <span id="user-chip" class="user-chip tab-btn hidden" data-tab="settings" title="Настройки профиля" style="cursor:pointer">
       <span id="nav-avatar" class="avatar avatar-sm">
         <img id="nav-avatar-img" alt="" class="hidden">
         <span id="nav-avatar-fallback" class="avatar-fallback"></span>
@@ -195,6 +365,12 @@
 
   <!-- ── ГЛАВНАЯ: экосистема (ядро + карточки) ── -->
   <div id="tab-home" class="tab-panel active">
+
+    <!-- ГЕРОЙ: чистые планеты (фоновая 3D-сцена), без текста -->
+    <section class="planet-hero"><span class="scroll-cue">Листайте вниз ↓</span></section>
+
+    <!-- ТЕКСТ на сплошном фоне — планеты за ним не просвечивают -->
+    <section class="home-content">
     <div class="eco-head">
       <span class="eyebrow">Десктоп-инструменты · Windows</span>
       <h1>Не набор программ — единая экосистема</h1>
@@ -228,22 +404,22 @@
 
       <!-- СКОРО (плейсхолдеры-кружки, без выдуманных файлов) -->
       <div class="eco-node is-soon n-publisher" data-key="publisher">
-        <div class="top"><span class="ico">📡</span><span class="nm">Publisher</span></div>
+        <div class="top"><span class="ico"><img src="img/publisher_icon.png" alt="" onerror="this.parentNode.textContent='📡'"></span><span class="nm">Publisher</span></div>
         <div class="desc">Публикуй сразу везде — один клик.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
       </div>
       <div class="eco-node is-soon n-leads" data-key="leads">
-        <div class="top"><span class="ico">🎯</span><span class="nm">Leads</span></div>
+        <div class="top"><span class="ico"><img src="img/leads_icon.png" alt="" onerror="this.parentNode.textContent='🎯'"></span><span class="nm">Leads</span></div>
         <div class="desc">База клиентов из 2ГИС — за минуты.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
       </div>
       <div class="eco-node is-soon n-monitor" data-key="monitor">
-        <div class="top"><span class="ico">📈</span><span class="nm">Monitor</span></div>
+        <div class="top"><span class="ico"><img src="img/monitor_icon.png" alt="" onerror="this.parentNode.textContent='📈'"></span><span class="nm">Monitor</span></div>
         <div class="desc">Новые объявления — мгновенно.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
       </div>
       <div class="eco-node is-soon n-analytics" data-key="analytics">
-        <div class="top"><span class="ico">📊</span><span class="nm">Analytics</span></div>
+        <div class="top"><span class="ico"><img src="img/analytics_icon.png" alt="" onerror="this.parentNode.textContent='📊'"></span><span class="nm">Analytics</span></div>
         <div class="desc">Цены конкурентов — без ручной работы.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
       </div>
@@ -261,6 +437,7 @@
       </button>
       <div class="hint">Все инструменты — в одном окне. Установите лаунчер, остальное запускается из него.</div>
     </div>
+    </section>
   </div>
 
   <!-- ── ПЛОЩАДКИ (контейнер заполняет platforms.js) ── -->
@@ -326,6 +503,78 @@
   <!-- ── НАСТРОЙКИ (контейнер заполняет main.js) ── -->
   <div id="tab-settings" class="tab-panel">
     <div id="settings-content"></div>
+  </div>
+
+  <!-- ── О НАС ── -->
+  <div id="tab-about" class="tab-panel">
+    <div class="sec-head reveal">
+      <h2>О Vacantrix</h2>
+      <p>Экосистема десктоп-инструментов, которые делают рутину за вас: автоотклики на вакансии, биржа задач, кросс-постинг и не только. Один аккаунт, один лаунчер — всё работает вместе.</p>
+    </div>
+    <div class="info-grid">
+      <div class="info-card reveal">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg></span>
+        <h3>Единая экосистема</h3>
+        <p>Инструменты связаны: общий профиль, сквозная авторизация, единый баланс. Не набор программ — система.</p>
+      </div>
+      <div class="info-card reveal" style="transition-delay:.06s">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>
+        <h3>Автоматизация рутины</h3>
+        <p>Боты и сборщики берут на себя монотонную работу, пока вы заняты важным.</p>
+      </div>
+      <div class="info-card reveal" style="transition-delay:.12s">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4 3 6.5 7 9 4-2.5 7-5 7-9V6z"/></svg></span>
+        <h3>Контроль и приватность</h3>
+        <p>Где возможно — всё работает локально на вашем ПК. Ваши данные остаются вашими.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ПОДДЕРЖКА ── -->
+  <div id="tab-support" class="tab-panel">
+    <div class="sec-head reveal"><h2>Поддержка</h2><p>Поможем быстро. Выберите удобный способ связи.</p></div>
+    <div class="info-grid">
+      <a class="info-card reveal" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4 3 11l6 2 2 6 3-4 4 3 3-14z"/></svg></span>
+        <h3>Telegram-бот</h3>
+        <p>Вопросы по подписке, оплате и работе инструментов — прямо в чате, отвечаем оперативно.</p>
+        <span class="ic-cta">Открыть бота →</span>
+      </a>
+      <a class="info-card reveal" href="mailto:support@vacantrix.app" style="transition-delay:.06s">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+        <h3>Электронная почта</h3>
+        <p>support@vacantrix.app — для подробных обращений, скриншотов и вложений.</p>
+        <span class="ic-cta">Написать письмо →</span>
+      </a>
+      <div class="info-card reveal" style="transition-delay:.12s">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M7 17h11"/></svg></span>
+        <h3>База знаний</h3>
+        <p>Инструкции по установке и настройке, ответы на частые вопросы. Скоро.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── СОТРУДНИЧЕСТВО ── -->
+  <div id="tab-partner" class="tab-panel">
+    <div class="sec-head reveal"><h2>Сотрудничество</h2><p>Растём вместе. Выберите формат партнёрства.</p></div>
+    <div class="info-grid">
+      <div class="info-card reveal">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="7" cy="7" r="2.2"/><circle cx="17" cy="17" r="2.2"/></svg></span>
+        <h3>Партнёрская программа</h3>
+        <p>Приводите пользователей по своей ссылке и получайте процент с их подписок.</p>
+      </div>
+      <div class="info-card reveal" style="transition-delay:.06s">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6M15 3v6M6 9h12v3a6 6 0 0 1-12 0z"/><path d="M12 18v3"/></svg></span>
+        <h3>Интеграции</h3>
+        <p>Хотите подключить свой сервис к экосистеме Vacantrix — обсудим API и условия.</p>
+      </div>
+      <a class="info-card reveal" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener" style="transition-delay:.12s">
+        <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
+        <h3>Связаться с нами</h3>
+        <p>Расскажите о вашей идее — подберём формат под задачу.</p>
+        <span class="ic-cta">Написать →</span>
+      </a>
+    </div>
   </div>
 </div>
 
@@ -445,6 +694,27 @@
   </div>
 </div>
 
+<!-- Детальная рамка приложения (клик по планете → наезд камеры + инфо) -->
+<div id="planet-detail" aria-hidden="true">
+  <button id="pd-close" aria-label="Закрыть">✕</button>
+  <div class="pd-head">
+    <span class="pd-ico"><img id="pd-img" alt=""></span>
+    <div><div class="pd-nm" id="pd-nm"></div><span class="pd-badge" id="pd-badge"></span></div>
+  </div>
+  <div class="pd-desc" id="pd-desc"></div>
+  <button class="pd-cta" id="pd-cta"></button>
+</div>
+
+<!-- Инфо-карточка планеты (наполняется intro3d.js при наведении на планету) -->
+<div id="planet-card" aria-hidden="true">
+  <div class="pc-top">
+    <span class="pc-ico"><img id="pc-img" alt=""></span>
+    <div><div class="pc-nm" id="pc-nm"></div><div class="pc-sub" id="pc-sub"></div></div>
+  </div>
+  <div class="pc-desc" id="pc-desc"></div>
+  <div class="pc-foot"><span class="pc-badge" id="pc-badge"></span><span class="pc-cta" id="pc-cta"></span></div>
+</div>
+
 <!-- ── Подвал ───────────────────────────────────────────────────────── -->
 <footer class="site-footer" style="text-align:center; padding:28px 16px; color:#6b7590; font-size:13px; border-top:1px solid rgba(255,255,255,.06); position:relative; z-index:1;">
   <a href="terms.html" style="color:#8893b0; text-decoration:none;">Пользовательское соглашение</a>
@@ -455,17 +725,19 @@
 </footer>
 
 <!-- ════════════════════════════════════════════════════════════════════
-     Скрипты (порядок обязателен; intro.js — после main.js)
+     Скрипты (порядок обязателен). 3D-интро (intro3d.js) — ESM-модуль, грузится отдельно.
 ════════════════════════════════════════════════════════════════════ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   (function () {
     var v = Date.now();
     var files = ['js/config.js', 'js/auth.js', 'js/profile.js',
-                 'js/platforms.js', 'js/apps.js', 'js/main.js', 'js/intro.js'];
+                 'js/platforms.js', 'js/apps.js', 'js/main.js'];
     for (var i = 0; i < files.length; i++) {
       document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');
     }
+    // 3D-интро на Three.js (ES-модуль, резолвится через import map в <head>).
+    document.write('<script type="module" src="js/intro3d.js?v=' + v + '"><\/script>');
   })();
 </script>
 
