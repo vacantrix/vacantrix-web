@@ -24,6 +24,9 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
+import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 (function () {
   'use strict';
@@ -85,7 +88,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
   try {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   } catch (e) { settleStatic(); return; }
-  renderer.setClearColor(0x05030a, 1);                 // непрозрачный тёмный (под bloom)
+  renderer.setClearColor(0x020105, 1);                 // тёмный космос (почти чёрный)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.92;                 // немного темнее
@@ -128,14 +131,41 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
-  function glowSprite(color, scale, opacity) {
+  function glowSprite(color, scale, opacity, tex) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: glowTex, color, blending: THREE.AdditiveBlending,
+      map: tex || glowTex, color, blending: THREE.AdditiveBlending,
       transparent: true, depthWrite: false, opacity: opacity == null ? 0.9 : opacity,
     }));
     s.scale.setScalar(scale);
     return s;
   }
+
+  // Процедурная «туманность»: много мягких клочков-сгустков (additive) + затухание
+  // к краям → клочковатое, живое свечение вместо ровного круга.
+  const nebulaTex = (function () {
+    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+    const g = c.getContext('2d');
+    g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+    g.globalCompositeOperation = 'lighter';
+    const cx = S / 2, cy = S / 2;
+    for (let i = 0; i < 30; i++) {
+      const ang = Math.random() * 6.2831853;
+      const dist = Math.pow(Math.random(), 0.7) * S * 0.34;     // сгущение к центру
+      const x = cx + Math.cos(ang) * dist, y = cy + Math.sin(ang) * dist;
+      const r = S * (0.05 + Math.random() * 0.17);
+      const a = 0.05 + Math.random() * 0.13;
+      const grd = g.createRadialGradient(x, y, 0, x, y, r);
+      grd.addColorStop(0, 'rgba(255,255,255,' + a.toFixed(3) + ')');
+      grd.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    }
+    g.globalCompositeOperation = 'destination-in';               // мягкое затухание к краям
+    const mask = g.createRadialGradient(cx, cy, 0, cx, cy, S * 0.5);
+    mask.addColorStop(0, 'rgba(0,0,0,1)'); mask.addColorStop(0.55, 'rgba(0,0,0,0.85)'); mask.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = mask; g.fillRect(0, 0, S, S);
+    g.globalCompositeOperation = 'source-over';
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
 
   // ── Скин планеты: МЕТАЛЛ + РЕЛЬЕФ, иконка на 6 ГРАНЯХ КУБА ──────────────
   // «Запекаем» куб→равноугольную развёртку: для каждого пикселя сферы берём
@@ -200,6 +230,39 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     );
     mesh.rotation.x = 0.28;
     return mesh;
+  }
+
+  // Светящиеся линии ПО ШВАМ куба (рёбра куба, спроецированные на сферу).
+  // Кладётся ребёнком планеты → вращается вместе с гранями. Зажигается при фокусе.
+  const seamMats = [];                                 // материалы швов (обновляем resolution на resize)
+  function makeSeams(radius) {
+    const corners = [];
+    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) corners.push([sx, sy, sz]);
+    const N = 16, pos = [];
+    for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++) {
+      let diff = 0; for (let k = 0; k < 3; k++) if (corners[a][k] !== corners[b][k]) diff++;
+      if (diff !== 1) continue;                          // только рёбра (12 шт.)
+      const A = corners[a], B = corners[b]; let prev = null;
+      for (let s = 0; s <= N; s++) {
+        const t = s / N;
+        const x = A[0] + (B[0] - A[0]) * t, y = A[1] + (B[1] - A[1]) * t, z = A[2] + (B[2] - A[2]) * t;
+        const inv = radius / Math.hypot(x, y, z);
+        const P = [x * inv, y * inv, z * inv];
+        if (prev) pos.push(prev[0], prev[1], prev[2], P[0], P[1], P[2]);
+        prev = P;
+      }
+    }
+    const geo = new LineSegmentsGeometry();
+    geo.setPositions(pos);
+    const mat = new LineMaterial({
+      color: 0xff3344, linewidth: 4, transparent: true, opacity: 0,   // красный неон по швам
+      blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true,
+    });
+    mat.resolution.set(window.innerWidth, window.innerHeight);        // нужен для толщины в px
+    seamMats.push(mat);
+    const seams = new LineSegments2(geo, mat);
+    seams.visible = false;
+    return seams;
   }
 
 
@@ -298,9 +361,11 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
   const coreMesh = makeMetalPlanet('platform', 1.6, ACCENT, 0.65);
   const coreInner = coreMesh;
   coreGroup.add(coreMesh);
+  const coreSeams = makeSeams(1.6 * 1.015);
+  coreMesh.add(coreSeams);
   const coreCircuit = makeCircuit(1.6 * 1.012);
   coreGroup.add(coreCircuit.mesh);
-  const coreHalo = glowSprite(0xff5a67, 9, 0);
+  const coreHalo = glowSprite(0xff5a67, 16, 0, nebulaTex);
   coreGroup.add(coreHalo);
 
   const rings = [];
@@ -346,9 +411,12 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     const mesh = makeMetalPlanet(key, pradius, color, 0.6);
     const core = mesh;                                  // ядро вращения = сама планета
     grp.add(mesh);
+    const seams = makeSeams(pradius * 1.015);
+    mesh.add(seams);                                    // ребёнок планеты → крутится с гранями
     const circuit = makeCircuit(pradius * 1.012);
     grp.add(circuit.mesh);
-    const halo = glowSprite(color, pradius * 2.6, 0);
+    const halo = glowSprite(color, pradius * 4.8, 0, nebulaTex);
+    halo.material.rotation = Math.random() * 6.2831853;   // своя фаза «облака»
     grp.add(halo);
     grp.scale.setScalar(0.001);                        // спрятан до раскрытия
     world.add(grp);
@@ -364,14 +432,14 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     world.add(pulse);
 
     return {
-      key, color, mesh, core, grp, halo, line, pulse, spin, circuit,
+      key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams,
       nx, ny, nz, home: new THREE.Vector3(), target: new THREE.Vector3(),
       ax, ay, az, fx, fy, fz, ph, py, pz, revealed: false,
     };
   });
 
   // ── Цели наведения (планеты + ядро) и raycast ─────────────────────────
-  const coreEntry = { key: 'platform', grp: coreGroup, mesh: coreMesh, core: coreInner, circuit: coreCircuit, home: new THREE.Vector3() };
+  const coreEntry = { key: 'platform', grp: coreGroup, mesh: coreMesh, core: coreInner, circuit: coreCircuit, seams: coreSeams, home: new THREE.Vector3() };
   const hoverables = [coreEntry].concat(nodes);
 
   // Множители раскладки под форму экрана (непрерывно по соотношению сторон):
@@ -434,7 +502,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 
   // Мягкое центральное свечение: насыщает центр и плавно гаснет к краям —
   // заполняет простор на широких экранах, чтобы края «сцены» не были пустыми.
-  const nebula = glowSprite(0x4a1018, 30, 0.13);
+  const nebula = glowSprite(0x3a0c14, 24, 0.06);
   nebula.position.set(0, 0, -7);
   world.add(nebula);
 
@@ -472,6 +540,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     renderer.setSize(w, h);
     composer.setSize(w, h);
     bloomPass.setSize(w, h);
+    seamMats.forEach(m => m.resolution.set(w, h));
     camera.aspect = w / h; camera.updateProjectionMatrix();
     baseDist = fitDistance();
     layoutHomes();
@@ -705,9 +774,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
     coreInner.material.emissiveIntensity = ig * (0.75 + beat * 0.18);
     coreInner.rotation.y += dt * 0.25;
     coreHalo.material.opacity = ig * (0.6 + beat * 0.1);
-    coreHalo.scale.setScalar(9 * (0.92 + 0.08 * beat) * (0.5 + 0.5 * ig));
+    coreHalo.material.rotation += dt * 0.03;
+    coreHalo.scale.setScalar(15 * (0.92 + 0.08 * beat) * (0.5 + 0.5 * ig));
     corePoint.intensity = ig * 2.6;
     rings.forEach((r, i) => { r.rotation.z += dt * (0.05 + i * 0.018); });
+    { const m = coreSeams.material;                      // швы ядра — при фокусе на Vacantrix
+      const tgt = (focusEntry === coreEntry) ? (0.5 + 0.5 * Math.sin(tsec * 4.5)) : 0;
+      m.opacity += (tgt - m.opacity) * Math.min(1, dt * 7); coreSeams.visible = m.opacity > 0.01; }
 
     if (phase === 'intro' && t > 950 && veil) veil.classList.add('lift');
 
@@ -719,6 +792,15 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
       if (focusEntry) p.lerp(n.home, fp);                // при фокусе планета замирает в home
       n.grp.position.copy(p);
       n.core.rotation.y += dt * n.spin;                  // вращается светящееся ядро
+
+      // Швы куба: зажигаются и пульсируют при фокусе (клике) на планете.
+      // Швы куба: зажигаются и пульсируют только при приближении (фокус/клик).
+      {
+        const m = n.seams.material;
+        const tgt = (focusEntry === n) ? (0.5 + 0.5 * Math.sin(tsec * 4.5)) : 0;
+        m.opacity += (tgt - m.opacity) * Math.min(1, dt * 7);
+        n.seams.visible = m.opacity > 0.01;
+      }
 
       if (phase === 'intro') {
         const tStart = FIRST + i * STAGGER;
@@ -741,11 +823,13 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
         n.halo.material.opacity = ease(grow) * 0.85;
       } else {
         n.grp.scale.setScalar(focusEntry && n !== focusEntry ? Math.max(0, 1 - fp) : 1);
-        n.halo.material.opacity = 0.42;
-        // лёгкое мерцание нитей в покое
-        n.line.material.opacity = 0.10 * (0.6 + 0.4 * Math.sin(tsec * 1.5 + i));
+        n.halo.material.opacity = 0.58 + 0.06 * Math.sin(tsec * 0.6 + i);   // лёгкое «дыхание»
+        n.halo.material.rotation += dt * (0.035 + (i % 3) * 0.012);          // медленное вращение облака
+
+        // Обычная простая линия, связывающая ядро и планету.
+        n.line.material.opacity = focusEntry ? 0 : 0.16;
         const lp = n.line.geometry.attributes.position.array;
-        lp[3] = p.x; lp[4] = p.y; lp[5] = p.z;
+        lp[0] = 0; lp[1] = 0; lp[2] = 0; lp[3] = p.x; lp[4] = p.y; lp[5] = p.z;
         n.line.geometry.attributes.position.needsUpdate = true;
       }
     }
