@@ -91,7 +91,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   renderer.setClearColor(0x020105, 1);                 // тёмный космос (почти чёрный)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.92;                 // немного темнее
+  renderer.toneMappingExposure = 0.82;                 // ещё немного темнее
   const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
   document.body.classList.add('planets-on');           // 3D активна → плитки eco-stage скрыты
 
@@ -104,13 +104,13 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
 
-  scene.add(new THREE.AmbientLight(0x404058, 0.55));
+  scene.add(new THREE.AmbientLight(0x404058, 0.42));
   const corePoint = new THREE.PointLight(ACCENT, 3.0, 90);
   scene.add(corePoint);
-  const keyLight = new THREE.DirectionalLight(0xffffff, 2.0);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
   keyLight.position.set(4, 5, 7);
   scene.add(keyLight);
-  const rimLight = new THREE.DirectionalLight(0xff4858, 1.2);
+  const rimLight = new THREE.DirectionalLight(0xff4858, 0.8);
   rimLight.position.set(-6, -1, -3);
   scene.add(rimLight);
 
@@ -224,11 +224,10 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(radius, 64, 48),
       new THREE.MeshStandardMaterial({
-        color: metal, metalness: 1.0, roughness: 0.28, envMapIntensity: 1.9,
+        color: metal, metalness: 0.95, roughness: 0.46, envMapIntensity: 0.95,
         bumpMap: tex, bumpScale: 0.06, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: emissive,
       })
     );
-    mesh.rotation.x = 0.28;
     return mesh;
   }
 
@@ -360,22 +359,25 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   world.add(coreGroup);
   const coreMesh = makeMetalPlanet('platform', 1.6, ACCENT, 0.65);
   const coreInner = coreMesh;
-  coreGroup.add(coreMesh);
+  const coreTilt = new THREE.Group();
+  coreTilt.rotation.set(0.24, 0, 0.15);                // осевой наклон ядра
+  coreTilt.add(coreMesh); coreGroup.add(coreTilt);
   const coreSeams = makeSeams(1.6 * 1.015);
   coreMesh.add(coreSeams);
   const coreCircuit = makeCircuit(1.6 * 1.012);
-  coreGroup.add(coreCircuit.mesh);
+  coreMesh.add(coreCircuit.mesh);
   const coreHalo = glowSprite(0xff5a67, 16, 0, nebulaTex);
   coreGroup.add(coreHalo);
 
   const rings = [];
-  [[0x4fd0ff, 3.2, 0.5, 0.16], [0x9b6bff, 4.1, -0.7, 0.12], [0x57d1ff, 5.0, 0.35, 0.09]]
-    .forEach(([col, r, tilt, op]) => {
+  // орбиты под общим наклоном (плоскость, согласованная с наклоном ядра) → видны как эллипсы
+  [[0x4fd0ff, 3.3, 0.05, 0.13], [0x9b6bff, 4.3, -0.04, 0.10], [0x57d1ff, 5.2, 0.08, 0.075]]
+    .forEach(([col, r, vary, op]) => {
       const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(r, 0.012, 8, 160),
+        new THREE.TorusGeometry(r, 0.012, 8, 200),
         new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op })
       );
-      ring.rotation.x = Math.PI / 2 + tilt; ring.rotation.z = tilt * 0.6;
+      ring.rotation.x = Math.PI / 2 - 0.42 + vary; ring.rotation.z = 0.2 + vary;
       world.add(ring); rings.push(ring);
     });
 
@@ -410,11 +412,14 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     const grp = new THREE.Group();
     const mesh = makeMetalPlanet(key, pradius, color, 0.6);
     const core = mesh;                                  // ядро вращения = сама планета
-    grp.add(mesh);
+    // осевой наклон (как у реальных планет), у каждой свой угол → вращение вокруг наклонённой оси
+    const tilt = new THREE.Group();
+    tilt.rotation.set(0.18 + (i % 3) * 0.13, 0, (i % 2 ? 1 : -1) * (0.16 + (i % 4) * 0.1));
+    tilt.add(mesh); grp.add(tilt);
     const seams = makeSeams(pradius * 1.015);
     mesh.add(seams);                                    // ребёнок планеты → крутится с гранями
     const circuit = makeCircuit(pradius * 1.012);
-    grp.add(circuit.mesh);
+    mesh.add(circuit.mesh);                             // ребёнок планеты → наклон+вращение авто
     const halo = glowSprite(color, pradius * 4.8, 0, nebulaTex);
     halo.material.rotation = Math.random() * 6.2831853;   // своя фаза «облака»
     grp.add(halo);
@@ -547,12 +552,40 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   }
   onResize();
 
-  // ── Параллакс от курсора ──────────────────────────────────────────────
+  // ── Параллакс + вращение системы мышью (ЛКМ) + зум колесом ────────────
   let mx = 0, my = 0, tmx = 0, tmy = 0;
+  let dragging = false, dragMoved = 0, wasDrag = false, lastDX = 0, lastDY = 0;
+  const userRot = { x: 0, y: 0 }, userRotTo = { x: 0, y: 0 };   // сглаженное / цель
+  let userZoom = 1, userZoomTo = 1;                    // отдаление максимум 1.5 (150%)
   function onMouse(e) {
     tmx = (e.clientX / window.innerWidth) * 2 - 1;
     tmy = (e.clientY / window.innerHeight) * 2 - 1;
+    if (dragging) {                                     // ЛКМ-перетаскивание → крутим всю систему
+      const dx = e.clientX - lastDX, dy = e.clientY - lastDY;
+      lastDX = e.clientX; lastDY = e.clientY;
+      dragMoved += Math.abs(dx) + Math.abs(dy);
+      userRotTo.y += dx * 0.006;
+      userRotTo.x = Math.max(-1.2, Math.min(1.2, userRotTo.x + dy * 0.006));
+      setHover(null);
+      return;
+    }
     pickHover(e);                                       // наведение на планету (только в idle)
+  }
+  function onDown(e) {
+    if (e.button !== 0 || phase !== 'idle' || focusEntry) return;
+    if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
+    dragging = true; dragMoved = 0; wasDrag = false; lastDX = e.clientX; lastDY = e.clientY;
+    document.body.style.cursor = 'grabbing';
+  }
+  function onUp() {
+    if (!dragging) return;
+    dragging = false; wasDrag = dragMoved > 6; document.body.style.cursor = '';
+  }
+  function onWheel(e) {                                 // зум; отдаление не больше 150%
+    if (phase !== 'idle' || focusEntry) return;
+    if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
+    e.preventDefault();
+    userZoomTo = Math.max(0.7, Math.min(1.5, userZoomTo + (e.deltaY > 0 ? 0.08 : -0.08)));
   }
 
   // ── Состояние / тайминги ──────────────────────────────────────────────
@@ -586,6 +619,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   // Клик: по планете — фокус; мимо планеты при фокусе — закрыть.
   function onClick(e) {
     if (phase !== 'idle') return;
+    if (wasDrag) { wasDrag = false; return; }          // это было вращение, а не клик
     if (e.target && e.target.closest && e.target.closest('#planet-detail')) return; // клики по рамке — мимо
     const inHero = e.target && e.target.closest && e.target.closest('.planet-hero');
     const picked = inHero ? pickAt(e.clientX, e.clientY) : null;
@@ -625,6 +659,8 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
         name,
         sub: small ? small.textContent.trim() : '',
         desc: (descEl ? descEl.textContent : (small ? small.textContent : '')).trim(),
+        detail: (el.getAttribute('data-detail') || '').trim(),     // длинное описание (карточка детали)
+        slogan: (el.getAttribute('data-slogan') || '').trim(),     // слоган
         live: badgeEl ? badgeEl.classList.contains('live') : true,
         badge: badgeEl ? badgeEl.textContent.trim() : (key === 'platform' ? 'Ядро' : ''),
         cta: ctaEl ? ctaEl.textContent.trim() : (key === 'platform' ? 'Скачать' : ''),
@@ -643,13 +679,14 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     pc.desc.textContent = d.desc; pc.desc.style.display = d.desc ? '' : 'none';
     pc.badge.textContent = d.badge; pc.badge.className = 'pc-badge ' + (d.live ? 'live' : 'soon');
     pc.badge.style.display = d.badge ? '' : 'none';
-    pc.cta.textContent = d.cta; pc.cta.style.display = d.cta ? '' : 'none';
+    if (pc.cta) pc.cta.style.display = 'none';     // запуск убран — всё через лаунчер
   }
 
   // ── Детальная рамка (focus-режим по клику) ────────────────────────────
   const detailEl = document.getElementById('planet-detail');
   const pd = detailEl ? {
     img: document.getElementById('pd-img'), nm: document.getElementById('pd-nm'),
+    slogan: document.getElementById('pd-slogan'),
     badge: document.getElementById('pd-badge'), desc: document.getElementById('pd-desc'),
     cta: document.getElementById('pd-cta'),
   } : null;
@@ -657,11 +694,12 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     if (!pd) return;
     const d = cardData(key);
     if (pd.img) pd.img.src = d.icon || ICON[key] || '';
-    pd.nm.textContent = d.name + (d.sub ? '' : '');
+    pd.nm.textContent = d.name;
+    if (pd.slogan) { pd.slogan.textContent = d.slogan; pd.slogan.style.display = d.slogan ? '' : 'none'; }
     pd.badge.textContent = d.badge || (d.live ? 'Работает' : 'Скоро');
     pd.badge.className = 'pd-badge ' + (d.live ? 'live' : 'soon');
-    pd.desc.textContent = d.desc || d.sub || '';
-    pd.cta.textContent = d.cta || (d.live ? 'Запустить' : 'Узнать первым');
+    pd.desc.textContent = d.detail || d.desc || d.sub || '';     // длинное описание от агента
+    pd.cta.textContent = d.live ? 'Скачать Vacantrix Platform' : 'Узнать первым';
   }
   function setFocus(entry) {
     focusTarget = entry || null;
@@ -743,18 +781,24 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     const tsec = t / 1000;
 
     // Камера: долли только на интро, дальше — стабильно.
+    // демпфирование пользовательского вращения/зума → ровное движение без рывков
+    const uk = Math.min(1, dt * 12);
+    userRot.x += (userRotTo.x - userRot.x) * uk;
+    userRot.y += (userRotTo.y - userRot.y) * uk;
+    userZoom += (userZoomTo - userZoom) * Math.min(1, dt * 8);
     const di = ease(clamp01(t / (IGNITE + 600)));
-    const dist = phase === 'intro' ? baseDist * (1.9 - 0.9 * di) : baseDist;
+    const dist = phase === 'intro' ? baseDist * (1.9 - 0.9 * di) : baseDist * userZoom;
     mx += (tmx - mx) * Math.min(1, dt * 3.0);
     my += (tmy - my) * Math.min(1, dt * 3.0);
 
-    // Фокус на планете (клик): затухание параллакса + наезд камеры к планете.
+    // Фокус на планете (клик): затухание вращения/параллакса + наезд камеры к планете.
     focus += ((focusTarget ? 1 : 0) - focus) * Math.min(1, dt * 3.5);
     if (focusTarget) focusEntry = focusTarget; else if (focus < 0.01) focusEntry = null;
     const fp = ease(clampv(focus, 0, 1));
     const par = 1 - fp;
-    world.rotation.y = mx * 0.16 * par;
-    world.rotation.x = my * 0.10 * par;
+    const prx = dragging ? 0 : 1;                       // во время ЛКМ-вращения параллакс выкл
+    world.rotation.y = (userRot.y + mx * 0.16 * prx) * par;
+    world.rotation.x = (userRot.x + my * 0.10 * prx) * par;
 
     let tcx = 0, tcy = 0, tcz = dist, tlx = 0, tly = 0, tlz = 0;
     if (focusEntry) {
@@ -846,7 +890,6 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
       if (c.mesh.visible) {
         c.mat.uniforms.uProg.value = c.prog;
         c.mat.uniforms.uTime.value = tsec;
-        c.mesh.rotation.copy(ent.core.rotation);       // вместе с ядром планеты
       }
     }
 
@@ -886,6 +929,9 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
   window.addEventListener('resize', onResize);
   window.addEventListener('mousemove', onMouse);
+  window.addEventListener('mousedown', onDown);
+  window.addEventListener('mouseup', onUp);
+  window.addEventListener('wheel', onWheel, { passive: false });
   window.addEventListener('click', onClick);
   document.addEventListener('visibilitychange', onVisibility);
   if (skip) skip.addEventListener('click', skipIntro);
@@ -897,8 +943,10 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   if (pdClose) pdClose.addEventListener('click', () => setFocus(null));
   const pdCta = document.getElementById('pd-cta');
   if (pdCta) pdCta.addEventListener('click', () => {
-    const dl = document.getElementById('hero-platform-dl');
-    if (dl) dl.click();                                  // CTA → флоу скачивания платформы
+    const k = focusTarget && focusTarget.key;
+    const live = k ? cardData(k).live : true;
+    if (live) document.getElementById('hero-platform-dl')?.click();          // скачать лаунчер
+    else window.open('https://t.me/VacantrixB_O_T', '_blank', 'noopener');   // «Узнать первым»
   });
 
   raf = requestAnimationFrame(frame);

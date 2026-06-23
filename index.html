@@ -233,6 +233,7 @@
     background: linear-gradient(140deg, rgba(230,57,70,.2), rgba(0,0,0,.3)); border: 1px solid var(--border2); display: grid; place-items: center; }
   .pd-ico img { width: 100%; height: 100%; object-fit: cover; }
   .pd-nm { font-size: 21px; font-weight: 800; line-height: 1.15; }
+  .pd-slogan { color: var(--accent-b); font-size: 12.5px; font-weight: 600; margin: 5px 0 3px; }
   .pd-badge { display: inline-block; margin-top: 7px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 6px; }
   .pd-badge.live { color: #58e08a; background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3); }
   .pd-badge.soon { color: var(--text3); background: rgba(255,255,255,.05); border: 1px solid var(--border2); }
@@ -380,45 +381,45 @@
     <!-- РЕДАКТИРУЕМО: ядро и карточки продуктов экосистемы -->
     <div class="eco-stage" id="eco-stage">
       <!-- ЯДРО -->
-      <div class="eco-core" data-key="platform">
+      <div class="eco-core" data-key="platform" data-slogan="Все инструменты в одном окне" data-detail="Единая точка входа в экосистему Vacantrix: один аккаунт, оплата и управление подпиской, скачивание и запуск любого инструмента без лишних шагов. Всё под рукой — с первого клика.">
         <div class="disc"><img src="img/platform_icon.png" alt="Vacantrix Platform" onerror="this.parentNode.textContent='✦'"></div>
         <div class="nm">Vacantrix Platform<small>лаунчер-магазин экосистемы</small></div>
       </div>
 
       <!-- РАБОЧИЕ -->
-      <div class="eco-node n-hh" data-key="hh">
+      <div class="eco-node n-hh" data-key="hh" data-slogan="Отклики сами, пока ты отдыхаешь" data-detail="Бот откликается на вакансии hh.ru с персональным сопроводительным письмом, пока ты занят делами. Бесплатный старт без подписки, без ручного труда — только приглашения на почте.">
         <div class="top"><span class="ico"><img src="img/hh_icon.png" alt="" onerror="this.parentNode.textContent='💼'"></span><span class="nm">HH-бот</span></div>
         <div class="desc">Отклики идут — вы спите.</div>
-        <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Запустить</button></div>
+        <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Скачать</button></div>
       </div>
-      <div class="eco-node n-avito" data-key="avito">
+      <div class="eco-node n-avito" data-key="avito" data-slogan="Вакансии Авито — без ручного труда" data-detail="Тот же принцип, что у HH-бота, но для Авито: автоматические отклики на подходящие вакансии с сопроводительным письмом. Бесплатный лимит есть — можно начать прямо сейчас.">
         <div class="top"><span class="ico"><img src="img/avito_icon.png" alt="" onerror="this.parentNode.textContent='🟢'"></span><span class="nm">Авито-бот</span></div>
         <div class="desc">Пока другие ищут — вы откликнулись.</div>
-        <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Запустить</button></div>
+        <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Скачать</button></div>
       </div>
-      <div class="eco-node n-tasks" data-key="tasks">
+      <div class="eco-node n-tasks" data-key="tasks" data-slogan="Задачи с гарантией оплаты" data-detail="Биржа для заказчиков и исполнителей: оплата удерживается до выполнения задачи, исполнитель получает деньги за результат, заказчик — защиту от пустых обещаний. Рейтинг и отзывы — честно.">
         <div class="top"><span class="ico"><img src="img/tasks_icon.png" alt="" onerror="this.parentNode.textContent='📋'"></span><span class="nm">Биржа задач</span></div>
         <div class="desc">Платите только за результат.</div>
-        <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Открыть</button></div>
+        <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Скачать</button></div>
       </div>
 
       <!-- СКОРО (плейсхолдеры-кружки, без выдуманных файлов) -->
-      <div class="eco-node is-soon n-publisher" data-key="publisher">
+      <div class="eco-node is-soon n-publisher" data-key="publisher" data-slogan="Один пост — все площадки" data-detail="Готовим инструмент кросс-постинга в Telegram, VK, Instagram, MAX, Одноклассники, WhatsApp и Авито: публикуй сразу везде по расписанию, смотри превью под каждую сеть, используй ИИ для текстов. Скоро.">
         <div class="top"><span class="ico"><img src="img/publisher_icon.png" alt="" onerror="this.parentNode.textContent='📡'"></span><span class="nm">Publisher</span></div>
         <div class="desc">Публикуй сразу везде — один клик.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
       </div>
-      <div class="eco-node is-soon n-leads" data-key="leads">
+      <div class="eco-node is-soon n-leads" data-key="leads" data-slogan="База клиентов за минуты" data-detail="Собираем сборщик контактов предприятий из 2ГИС: название, телефон, адрес — готовый список для обзвона или рассылки без ручного копирования. Скоро.">
         <div class="top"><span class="ico"><img src="img/leads_icon.png" alt="" onerror="this.parentNode.textContent='🎯'"></span><span class="nm">Leads</span></div>
         <div class="desc">База клиентов из 2ГИС — за минуты.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
       </div>
-      <div class="eco-node is-soon n-monitor" data-key="monitor">
+      <div class="eco-node is-soon n-monitor" data-key="monitor" data-slogan="Новые объявления — первым" data-detail="Готовим инструмент для отслеживания новых вакансий и объявлений на Авито и HH: уведомление приходит сразу, как появляется подходящая позиция или новый конкурент. Скоро.">
         <div class="top"><span class="ico"><img src="img/monitor_icon.png" alt="" onerror="this.parentNode.textContent='📈'"></span><span class="nm">Monitor</span></div>
         <div class="desc">Новые объявления — мгновенно.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
       </div>
-      <div class="eco-node is-soon n-analytics" data-key="analytics">
+      <div class="eco-node is-soon n-analytics" data-key="analytics" data-slogan="Цены конкурентов на виду" data-detail="Готовим аналитику рынка по Авито, Wildberries и Ozon: отслеживай изменения цен конкурентов в автоматическом режиме без ручного мониторинга вкладок. Скоро.">
         <div class="top"><span class="ico"><img src="img/analytics_icon.png" alt="" onerror="this.parentNode.textContent='📊'"></span><span class="nm">Analytics</span></div>
         <div class="desc">Цены конкурентов — без ручной работы.</div>
         <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
@@ -699,7 +700,7 @@
   <button id="pd-close" aria-label="Закрыть">✕</button>
   <div class="pd-head">
     <span class="pd-ico"><img id="pd-img" alt=""></span>
-    <div><div class="pd-nm" id="pd-nm"></div><span class="pd-badge" id="pd-badge"></span></div>
+    <div><div class="pd-nm" id="pd-nm"></div><div class="pd-slogan" id="pd-slogan"></div><span class="pd-badge" id="pd-badge"></span></div>
   </div>
   <div class="pd-desc" id="pd-desc"></div>
   <button class="pd-cta" id="pd-cta"></button>
