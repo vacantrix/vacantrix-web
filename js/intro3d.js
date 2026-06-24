@@ -656,6 +656,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   let focus = 0, focusTarget = null, focusEntry = null, focusRef = null;
   // focusEntry — гейт ВЗАИМОДЕЙСТВИЯ (сбрасывается рано, чтобы вернуть управление);
   // focusRef — ВИЗУАЛЬНАЯ ссылка, держится до полного возврата камеры (fp≈0), без рывка в конце.
+  let focusGoal = 0, focusFrom = 0, focusElapsed = 0;   // твин focus по ТАЙМЕРУ (конечная длительность)
   const fCam = { x: 0, y: 0, z: 0 }, fLook = { x: 0, y: 0, z: 0 };  // сохранённая цель фокуса — НЕ исчезает при сбросе focusRef
 
   const IGNITE = 1000, FIRST = 850, STAGGER = 230, PULSE_DUR = 720;
@@ -857,11 +858,19 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     my += (tmy - my) * Math.min(1, dt * 3.0);
 
     // Фокус на планете (клик): затухание вращения/параллакса + наезд камеры к планете.
-    focus += ((focusTarget ? 1 : 0) - focus) * Math.min(1, dt * 3.5);
+    // focus тянем по ТАЙМЕРУ (easeInOut) → конечная длительность и НУЛЕВАЯ скорость на обоих
+    // концах. Прежнее асимптотическое затухание давало бесконечный «хвост»: камера ползла
+    // последние проценты ~секунду и будто резко замирала — это и читалось как рывок в конце.
+    const fGoal = focusTarget ? 1 : 0;
+    if (fGoal !== focusGoal) { focusFrom = focus; focusElapsed = 0; focusGoal = fGoal; }
+    focusElapsed += dt;
+    const fk  = clampv(focusElapsed / (fGoal ? 0.6 : 0.78), 0, 1);                 // вход 0.6 c, возврат 0.78 c
+    const fke = fk < 0.5 ? 4 * fk * fk * fk : 1 - Math.pow(-2 * fk + 2, 3) / 2;     // easeInOut: мягкий старт и мягкая посадка
+    focus = lerp(focusFrom, fGoal, fke);
     if (focusTarget) { focusEntry = focusTarget; focusRef = focusTarget; }
     else {
       if (focus < 0.01)    focusEntry = null;  // управление снова доступно (камера почти дома)
-      if (focus < 0.0001)  focusRef   = null;  // визуал держим почти до нуля → остаточный сдвиг < 0.2px и скорость ≈0 (рывка не видно)
+      if (focus < 0.0001)  focusRef   = null;  // визуальную ссылку держим до самого нуля
     }
     const fp = ease(clampv(focus, 0, 1));
     const par = 1 - fp;
