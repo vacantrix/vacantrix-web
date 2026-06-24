@@ -1,0 +1,14 @@
+{
+  "name": "Vacantrix — экосистема инструментов",
+  "short_name": "Vacantrix",
+  "description": "Единая экосистема десктоп-инструментов: авто-отклики, биржа задач, кросс-постинг.",
+  "lang": "ru",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0a0c",
+  "theme_color": "#e63946",
+  "icons": [
+    { "src": "favicon.png", "sizes": "64x64", "type": "image/png" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }
+  ]
+}
