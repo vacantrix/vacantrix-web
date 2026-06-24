@@ -656,6 +656,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   let focus = 0, focusTarget = null, focusEntry = null, focusRef = null;
   // focusEntry — гейт ВЗАИМОДЕЙСТВИЯ (сбрасывается рано, чтобы вернуть управление);
   // focusRef — ВИЗУАЛЬНАЯ ссылка, держится до полного возврата камеры (fp≈0), без рывка в конце.
+  const fCam = { x: 0, y: 0, z: 0 }, fLook = { x: 0, y: 0, z: 0 };  // сохранённая цель фокуса — НЕ исчезает при сбросе focusRef
 
   const IGNITE = 1000, FIRST = 850, STAGGER = 230, PULSE_DUR = 720;
   const END = FIRST + KEYS.length * STAGGER + PULSE_DUR + 520;
@@ -859,8 +860,8 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     focus += ((focusTarget ? 1 : 0) - focus) * Math.min(1, dt * 3.5);
     if (focusTarget) { focusEntry = focusTarget; focusRef = focusTarget; }
     else {
-      if (focus < 0.01)   focusEntry = null;   // управление снова доступно (камера почти дома)
-      if (focus < 0.0015) focusRef   = null;   // визуал держим до конца → бесшовное оседание
+      if (focus < 0.01)    focusEntry = null;  // управление снова доступно (камера почти дома)
+      if (focus < 0.0001)  focusRef   = null;  // визуал держим почти до нуля → остаточный сдвиг < 0.2px и скорость ≈0 (рывка не видно)
     }
     const fp = ease(clampv(focus, 0, 1));
     const par = 1 - fp;
@@ -868,15 +869,16 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     world.rotation.y = (userRot.y + mx * 0.16 * prx) * par;
     world.rotation.x = (userRot.x + my * 0.10 * prx) * par;
 
-    let tcx = 0, tcy = 0, tcz = dist, tlx = 0, tly = 0, tlz = 0;
-    if (focusRef) {
+    if (focusRef) {                                    // обновляем сохранённую цель, пока фокус «жив»
       const H = focusRef.home;
       const r = (focusRef.mesh.geometry.parameters.radius || 0.5) * focusRef.grp.scale.x;
       const gap = Math.max(3.0, r * 5.5);
-      tcx = H.x; tcy = H.y; tcz = H.z + gap; tlx = H.x; tly = H.y; tlz = H.z;
+      fCam.x = H.x; fCam.y = H.y; fCam.z = H.z + gap; fLook.x = H.x; fLook.y = H.y; fLook.z = H.z;
     }
-    camera.position.set(lerp(0, tcx, fp), lerp(0, tcy, fp), lerp(dist, tcz, fp));
-    camera.lookAt(lerp(0, tlx, fp), lerp(0, tly, fp), lerp(0, tlz, fp));
+    // Цель НЕ обнуляется при сбросе focusRef → камера доезжает до дефолта без разрыва
+    // позиции/скорости: fp плавно стремится к 0, цель остаётся прежней (при fp≈0 неважна).
+    camera.position.set(lerp(0, fCam.x, fp), lerp(0, fCam.y, fp), lerp(dist, fCam.z, fp));
+    camera.lookAt(lerp(0, fLook.x, fp), lerp(0, fLook.y, fp), lerp(0, fLook.z, fp));
 
     // Ядро: зажигание (на интро) + вечный пульс и самовращение.
     const ig = phase === 'intro' ? ease(clamp01((t - 150) / IGNITE)) : 1;
