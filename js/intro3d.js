@@ -653,7 +653,9 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   // ── Состояние / тайминги ──────────────────────────────────────────────
   let phase = 'intro';            // 'intro' → 'idle'
   let raf = 0, start = 0, last = 0, endAt = 0, paused = false;
-  let focus = 0, focusTarget = null, focusEntry = null;   // фокус-режим (клик по планете)
+  let focus = 0, focusTarget = null, focusEntry = null, focusRef = null;
+  // focusEntry — гейт ВЗАИМОДЕЙСТВИЯ (сбрасывается рано, чтобы вернуть управление);
+  // focusRef — ВИЗУАЛЬНАЯ ссылка, держится до полного возврата камеры (fp≈0), без рывка в конце.
 
   const IGNITE = 1000, FIRST = 850, STAGGER = 230, PULSE_DUR = 720;
   const END = FIRST + KEYS.length * STAGGER + PULSE_DUR + 520;
@@ -855,7 +857,11 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
     // Фокус на планете (клик): затухание вращения/параллакса + наезд камеры к планете.
     focus += ((focusTarget ? 1 : 0) - focus) * Math.min(1, dt * 3.5);
-    if (focusTarget) focusEntry = focusTarget; else if (focus < 0.01) focusEntry = null;
+    if (focusTarget) { focusEntry = focusTarget; focusRef = focusTarget; }
+    else {
+      if (focus < 0.01)   focusEntry = null;   // управление снова доступно (камера почти дома)
+      if (focus < 0.0015) focusRef   = null;   // визуал держим до конца → бесшовное оседание
+    }
     const fp = ease(clampv(focus, 0, 1));
     const par = 1 - fp;
     const prx = dragging ? 0 : 1;                       // во время ЛКМ-вращения параллакс выкл
@@ -863,9 +869,9 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     world.rotation.x = (userRot.x + my * 0.10 * prx) * par;
 
     let tcx = 0, tcy = 0, tcz = dist, tlx = 0, tly = 0, tlz = 0;
-    if (focusEntry) {
-      const H = focusEntry.home;
-      const r = (focusEntry.mesh.geometry.parameters.radius || 0.5) * focusEntry.grp.scale.x;
+    if (focusRef) {
+      const H = focusRef.home;
+      const r = (focusRef.mesh.geometry.parameters.radius || 0.5) * focusRef.grp.scale.x;
       const gap = Math.max(3.0, r * 5.5);
       tcx = H.x; tcy = H.y; tcz = H.z + gap; tlx = H.x; tly = H.y; tlz = H.z;
     }
@@ -875,7 +881,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     // Ядро: зажигание (на интро) + вечный пульс и самовращение.
     const ig = phase === 'intro' ? ease(clamp01((t - 150) / IGNITE)) : 1;
     const beat = Math.sin(tsec * 1.7);
-    const coreFocusK = (focusEntry && focusEntry !== coreEntry) ? Math.max(0, 1 - fp) : 1;
+    const coreFocusK = (focusRef && focusRef !== coreEntry) ? Math.max(0, 1 - fp) : 1;
     coreGroup.scale.setScalar((0.4 + 0.6 * ig) * (1 + beat * 0.05) * coreFocusK);
     coreInner.material.emissiveIntensity = ig * (0.75 + beat * 0.18);
     coreInner.rotation.y += dt * 0.25;
@@ -895,7 +901,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
       const n = nodes[i];
       n.home.lerp(n.target, Math.min(1, dt * 2.6));      // плавная подстройка под экран
       const p = floatPos(n, tsec);
-      if (focusEntry) p.lerp(n.home, fp);                // при фокусе планета замирает в home
+      if (focusRef) p.lerp(n.home, fp);                  // при фокусе планета замирает в home
       n.grp.position.copy(p);
       n.core.rotation.y += dt * n.spin;                  // вращается светящееся ядро
 
@@ -928,12 +934,12 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
         n.grp.scale.setScalar(ease(grow));
         n.halo.material.opacity = ease(grow) * 0.85;
       } else {
-        n.grp.scale.setScalar(focusEntry && n !== focusEntry ? Math.max(0, 1 - fp) : 1);
+        n.grp.scale.setScalar(focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1);
         n.halo.material.opacity = 0.58 + 0.06 * Math.sin(tsec * 0.6 + i);   // лёгкое «дыхание»
         n.halo.material.rotation += dt * (0.035 + (i % 3) * 0.012);          // медленное вращение облака
 
         // Обычная простая линия, связывающая ядро и планету.
-        n.line.material.opacity = focusEntry ? 0 : 0.16;
+        n.line.material.opacity = 0.16 * (1 - fp);          // плавно гаснет при наезде / проявляется при возврате (без рывка)
         const lp = n.line.geometry.attributes.position.array;
         lp[0] = 0; lp[1] = 0; lp[2] = 0; lp[3] = p.x; lp[4] = p.y; lp[5] = p.z;
         n.line.geometry.attributes.position.needsUpdate = true;
