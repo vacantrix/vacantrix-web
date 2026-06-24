@@ -44,7 +44,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     hh: 0xff5a67, avito: 0x4fd0ff, tasks: 0x68e6a0, publisher: 0xff7a86,
     leads: 0xff9e57, monitor: 0x5ad1ff, analytics: 0xffd166,
   };
-  const IMG_V = '?v=20260624b';                        // кэш-бастер иконок (обновляй при замене файла)
+  const IMG_V = '?v=20260624c';                        // кэш-бастер иконок (обновляй при замене файла)
   const ICON = {
     platform: 'img/platform_icon.png' + IMG_V, hh: 'img/hh_icon.png' + IMG_V, avito: 'img/avito_icon.png' + IMG_V,
     tasks: 'img/tasks_icon.png' + IMG_V, publisher: 'img/publisher_icon.png' + IMG_V, leads: 'img/leads_icon.png' + IMG_V,
