@@ -588,6 +588,68 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     userZoomTo = Math.max(0.7, Math.min(1.5, userZoomTo + (e.deltaY > 0 ? 0.08 : -0.08)));
   }
 
+  // ── Тач: палец крутит систему (как ЛКМ на ПК), щипок — зум ─────────────
+  // Важно: вертикальный свайп ОТДАЁМ браузеру (скролл страницы — иначе из героя
+  // 86vh не добраться до контента). Ось определяем после небольшого порога:
+  // горизонталь-доминанта → вращение (и наклон по вертикали внутри жеста),
+  // вертикаль-доминанта → скролл. `.planet-hero { touch-action: pan-y }` помогает.
+  let touchMode = null;          // null | 'decide' | 'rotate' | 'scroll' | 'pinch'
+  let tStartX = 0, tStartY = 0, tLastX = 0, tLastY = 0, pinchDist = 0;
+  const _tdist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  const _inHero = t => t && t.target && t.target.closest && t.target.closest('.planet-hero');
+
+  function onTouchStart(e) {
+    if (phase !== 'idle' || focusEntry) { touchMode = null; return; }
+    if (e.touches.length >= 2) {                        // щипок → зум
+      if (!_inHero(e)) { touchMode = null; return; }
+      touchMode = 'pinch';
+      pinchDist = _tdist(e.touches[0], e.touches[1]);
+      dragging = false; wasDrag = true;                 // двупалый жест — не тап
+      return;
+    }
+    const t = e.touches[0];
+    if (!(t && t.target && t.target.closest && t.target.closest('.planet-hero'))) { touchMode = null; return; }
+    touchMode = 'decide';                               // ещё не знаем: вращение или скролл
+    tStartX = tLastX = t.clientX; tStartY = tLastY = t.clientY;
+    dragging = false; dragMoved = 0; wasDrag = false;
+  }
+
+  function onTouchMove(e) {
+    if (phase !== 'idle' || focusEntry || !touchMode) return;
+    if (touchMode === 'pinch' && e.touches.length >= 2) {
+      const d = _tdist(e.touches[0], e.touches[1]);
+      if (pinchDist > 0) {                              // сведение пальцев → приближение
+        const ratio = d / pinchDist;
+        userZoomTo = Math.max(0.7, Math.min(1.5, userZoomTo / ratio));
+      }
+      pinchDist = d; e.preventDefault();
+      return;
+    }
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const totX = t.clientX - tStartX, totY = t.clientY - tStartY;
+    if (touchMode === 'decide') {
+      if (Math.abs(totX) < 7 && Math.abs(totY) < 7) { return; }   // ждём явного направления
+      if (Math.abs(totX) > Math.abs(totY)) { touchMode = 'rotate'; dragging = true; }
+      else { touchMode = 'scroll'; return; }            // вертикаль → браузерный скролл
+    }
+    if (touchMode === 'rotate') {
+      const dx = t.clientX - tLastX, dy = t.clientY - tLastY;
+      tLastX = t.clientX; tLastY = t.clientY;
+      dragMoved += Math.abs(dx) + Math.abs(dy);
+      userRotTo.y += dx * 0.006;
+      userRotTo.x = Math.max(-1.2, Math.min(1.2, userRotTo.x + dy * 0.006));
+      setHover(null);
+      e.preventDefault();                               // не даём странице дёргаться по горизонтали
+    }
+  }
+
+  function onTouchEnd(e) {
+    if (touchMode === 'rotate') wasDrag = dragMoved > 6;   // был поворот → подавить тап-фокус
+    if (e.touches.length === 0) { touchMode = null; dragging = false; }
+    else if (touchMode === 'pinch' && e.touches.length < 2) { touchMode = null; dragging = false; }
+  }
+
   // ── Состояние / тайминги ──────────────────────────────────────────────
   let phase = 'intro';            // 'intro' → 'idle'
   let raf = 0, start = 0, last = 0, endAt = 0, paused = false;
@@ -932,6 +994,10 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   window.addEventListener('mousedown', onDown);
   window.addEventListener('mouseup', onUp);
   window.addEventListener('wheel', onWheel, { passive: false });
+  window.addEventListener('touchstart', onTouchStart, { passive: true });
+  window.addEventListener('touchmove', onTouchMove, { passive: false });   // нужен preventDefault при вращении
+  window.addEventListener('touchend', onTouchEnd, { passive: true });
+  window.addEventListener('touchcancel', onTouchEnd, { passive: true });
   window.addEventListener('click', onClick);
   document.addEventListener('visibilitychange', onVisibility);
   if (skip) skip.addEventListener('click', skipIntro);

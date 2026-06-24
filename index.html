@@ -31,7 +31,8 @@
     background: var(--glass); backdrop-filter: var(--blur);
     border-bottom: 1px solid var(--border2); }
   .tp-brand { display: inline-block; font-size: 18px; font-weight: 800;
-    letter-spacing: .04em; margin-right: 10px; cursor: pointer; color: #f5f5fa; }
+    letter-spacing: .04em; margin-right: 10px; cursor: pointer; color: #f5f5fa;
+    white-space: nowrap; flex-shrink: 0; }   /* бренд никогда не переносится/не сжимается */
   .tp-brand span { display: inline-block; }   /* каждая буква — для прыжка */
   @keyframes brandHop { 0%, 100% { transform: translateY(0); } 42% { transform: translateY(-7px); } }
   .tp-brand:hover span { animation: brandHop .42s ease; }
@@ -68,7 +69,7 @@
     padding: 9px 11px; border-radius: 8px; cursor: pointer; font-family: inherit; }
   .tp-drop-item:hover { background: rgba(255,255,255,.06); color: var(--text); }
   .tp-drop-item .di { width: 18px; text-align: center; }
-  .tp-actions { margin-left: auto; }   /* существующие кнопки входа/чип переезжают сюда */
+  .tp-actions { margin-left: auto; flex-shrink: 0; }   /* существующие кнопки входа/чип переезжают сюда */
 
   /* ── B. Интро-оверлей ── */
   #intro-veil { position: fixed; inset: 0; z-index: 1000; background: #000;
@@ -175,7 +176,8 @@
      Сверху — чистый экран с планетами (прозрачно). Ниже — текст на СПЛОШНОМ фоне
      (планеты за ним не просвечивают). Планеты видны только в герое главной. */
   .planet-hero { position: relative; min-height: 86vh; width: 100vw; margin-left: calc(50% - 50vw);
-    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 24px; }
+    display: flex; align-items: flex-end; justify-content: center; padding-bottom: 24px;
+    touch-action: pan-y; }   /* вертикаль — скролл браузера; горизонталь/щипок — вращение/зум в JS */
   body:not(.planets-on) .planet-hero { display: none; }   /* нет 3D → нет пустого героя */
   .scroll-cue { color: #fff; font-size: 14px; font-weight: 700; letter-spacing: .05em;
     text-align: center; opacity: 1; animation: cueBob 1.6s ease-in-out infinite;
@@ -282,7 +284,9 @@
   .tp-tab:hover .tp-ic-bob { animation: tpBob .6s ease; }
 
   @media (max-width: 920px) {
-    .tp-tabs { margin-left: 8px; gap: 0; overflow-x: auto; scrollbar-width: none; }
+    .topbar { padding: 0 12px; gap: 4px; }     /* больше места под вкладки */
+    .tp-tabs { margin-left: 8px; gap: 0; min-width: 0;   /* можно сжиматься → внутренний скролл, без распирания страницы */
+      overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     .tp-tabs::-webkit-scrollbar { display: none; }
     .tp-lbl { display: none; }                 /* на узких — только иконки */
     .tp-tab { padding: 9px 10px; }
@@ -306,6 +310,24 @@
   .info-card p { color: var(--text2); font-size: 13.5px; line-height: 1.55; }
   .ic-cta { display: inline-block; margin-top: 13px; color: var(--accent-b); font-weight: 700; font-size: 13px; }
   @media (max-width: 760px) { .info-grid { grid-template-columns: 1fr; } }
+
+  /* ══════════ Мобильная доводка топбара и панели планеты ══════════ */
+  @media (max-width: 600px) {
+    /* при входе в шапке оставляем только аватар — имя занимает место */
+    #user-info { display: none; }
+  }
+  @media (max-width: 420px) {
+    /* на самых узких ужимаем вкладки, чтобы все 5 иконок влезли без скролла */
+    .tp-tab { padding: 9px 5px; }
+    .tp-tabs { margin-left: 4px; }
+  }
+  @media (max-width: 760px) {
+    /* Детальная панель планеты (клик/тап) → нижний лист: ближе к пальцу, на всю ширину */
+    #planet-detail { right: 10px; left: 10px; top: auto; bottom: 10px;
+      width: auto; max-width: none; padding: 20px;
+      transform: translateY(24px); }
+    #planet-detail.show { transform: translateY(0); }
+  }
   </style>
 </head>
 <body>
@@ -739,6 +761,22 @@
     }
     // 3D-интро на Three.js (ES-модуль, резолвится через import map в <head>).
     document.write('<script type="module" src="js/intro3d.js?v=' + v + '"><\/script>');
+
+    // Страховка от «чёрного экрана»: если интро не завершилось за 8 c (модуль/CDN
+    // Three.js не поднялся — частый случай на медленном мобильном интернете),
+    // принудительно показываем контент (плитки-каталог) и снимаем вуаль.
+    // Штатное интро оседает к ~6.2 c, так что обычного пользователя это не затронет.
+    setTimeout(function () {
+      if (document.body.classList.contains('intro-done')) return;
+      try {
+        var nodes = document.querySelectorAll('.eco-core, .eco-node');
+        for (var j = 0; j < nodes.length; j++) nodes[j].classList.add('shown');
+        var veil = document.getElementById('intro-veil');   if (veil) veil.classList.add('lift');
+        var cv   = document.getElementById('intro-canvas');  if (cv) cv.classList.add('done');
+        document.body.classList.remove('intro-lock', 'planets-on');
+        document.body.classList.add('intro-done');
+      } catch (e) {}
+    }, 8000);
   })();
 </script>
 
