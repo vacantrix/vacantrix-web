@@ -117,6 +117,7 @@ const AppDetail = (() => {
     const isLive = d.status === 'live';
     const how    = Array.isArray(d.how) ? d.how : [];
     const steps  = Array.isArray(d.steps) ? d.steps : [];
+    const tips   = Array.isArray(d.tips) ? d.tips : [];
     const shots  = Array.isArray(d.screenshots) ? d.screenshots : [];
 
     // Иконка с emoji-фолбеком (как в .eco-stage): onerror кладёт emoji в бокс.
@@ -158,6 +159,12 @@ const AppDetail = (() => {
               <section class="ad-section">
                 <h3>Как начать</h3>
                 <ol class="ad-steps">${steps.map(s => `<li>${_esc(s)}</li>`).join('')}</ol>
+              </section>` : ''}
+
+            ${tips.length ? `
+              <section class="ad-section">
+                <h3>Рекомендации по работе</h3>
+                <ul class="ad-list ad-tips">${tips.map(t => `<li>${_esc(t)}</li>`).join('')}</ul>
               </section>` : ''}
 
             ${shots.length ? `

@@ -996,3 +996,217 @@ body.app-detail-open { overflow: hidden; }
 
 /* Клик по карточке приложения (2D) открывает полную карточку */
 .app-card { cursor: pointer; }
+
+/* ===================================================================
+   АНИМАЦИИ «АВТОМАТИЗАЦИЯ» — общий мотив: данные/сигналы бегут по линии.
+   Палитра только из токенов (--accent/--accent-b/--accent-d) + house-rgba
+   красного (230,57,70). Движение — transform/opacity (без layout-thrash).
+   =================================================================== */
+
+/* ── ЗАДАЧА 1. Конвейер данных по нижней кромке топбара (.header-fx) ──
+   Абсолютный слой на дне .topbar (sticky = containing block). Виден в 2D и 3D,
+   не перекрывает текст/CTA/переключатель (живёт в нижних ~6px, контент выше). */
+.header-fx {
+  position: absolute; left: 0; right: 0; bottom: -1px; height: 6px;
+  z-index: 0; pointer-events: none; overflow: hidden;
+}
+/* рейл-«провод»: тонкая прерывистая линия (статичная текстура схемы) */
+.header-fx .hfx-rail {
+  position: absolute; left: 0; right: 0; bottom: 1px; height: 1px;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(230,57,70,.22) 0 3px,
+      transparent 3px 7px,
+      rgba(230,57,70,.10) 7px 9px,
+      transparent 9px 16px);
+}
+/* пакеты-сигналы: бегущие красные «искры» по проводу */
+.header-fx .hfx-pkt {
+  position: absolute; bottom: 0; left: 0; width: 56px; height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--accent-b) 55%, #fff);
+  box-shadow: 0 0 6px 1px rgba(230,57,70,.75);
+  opacity: 0; transform: translateX(-60px);
+  animation: hfxRun 5.2s linear infinite;
+}
+.header-fx .hfx-pkt:nth-child(2) { animation-delay: 0s;    animation-duration: 5.2s; }
+.header-fx .hfx-pkt:nth-child(3) { animation-delay: 1.9s;  animation-duration: 6.4s; }
+.header-fx .hfx-pkt:nth-child(4) { animation-delay: 3.6s;  animation-duration: 4.6s; }
+@keyframes hfxRun {
+  0%   { transform: translateX(-60px); opacity: 0; }
+  8%   { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateX(100vw); opacity: 0; }
+}
+/* в 3D чуть приглушаем, чтобы не спорить с живым канвасом */
+body.mode-3d .header-fx { opacity: .7; }
+
+/* ── ЗАДАЧА 2. Нижний прогресс-бегунок (#scroll-anim) по --scroll-progress ──
+   fill = пройденный путь, runner(шестерёнка) = текущая точка, rail = остаток. */
+.sfx-track {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px;
+  background:
+    repeating-linear-gradient(90deg,
+      rgba(230,57,70,.10) 0 6px, transparent 6px 12px);
+  border-radius: 3px;
+}
+.sfx-fill {
+  position: absolute; left: 0; bottom: 0; height: 3px;
+  width: calc(var(--scroll-progress, 0) * 100%);
+  background: linear-gradient(90deg, var(--accent-d), var(--accent-b));
+  box-shadow: 0 0 10px 1px rgba(230,57,70,.65);
+  border-radius: 3px;
+}
+.sfx-runner {
+  position: absolute; bottom: 1px; left: calc(var(--scroll-progress, 0) * 100%);
+  width: 22px; height: 22px; margin-left: -11px;
+  display: grid; place-items: center; color: #fff;
+  border-radius: 50%; border: 1px solid var(--accent-b);
+  background: radial-gradient(circle at 50% 32%, var(--accent-b), var(--accent-d));
+  box-shadow: 0 0 12px 1px rgba(230,57,70,.75), 0 0 0 4px rgba(230,57,70,.12);
+}
+.sfx-runner svg { width: 14px; height: 14px; animation: sfxSpin 3.4s linear infinite; }
+@keyframes sfxSpin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) {
+  .sfx-track, .sfx-fill { height: 2px; }
+  .sfx-runner { width: 16px; height: 16px; margin-left: -8px; }
+  .sfx-runner svg { width: 11px; height: 11px; }
+}
+
+/* prefers-reduced-motion: всё движение по теме автоматизации — стоп.
+   Топбар: убрать бегущие пакеты (оставить статичный провод).
+   Низ: спрятать fill/бегунок, оставить тонкий статичный рейл. */
+@media (prefers-reduced-motion: reduce) {
+  .header-fx .hfx-pkt { display: none; }
+  .sfx-fill, .sfx-runner { display: none; }
+  .sfx-runner svg { animation: none; }
+}
+
+/* ===================================================================
+   ЗАДАЧА 3a. Премиум-таблица тарифов (#pricing-content → .pricing-table)
+   Источник разметки — js/pricing.js (классы pt-*). JS не трогаем.
+   =================================================================== */
+/* Обёртка = карточка-«стекло» с прокруткой внутри (overflow-x:auto уже инлайн).
+   Скролл-тени на краях (background-attachment: local/scroll) — хинт прокрутки. */
+.pricing-table-wrap {
+  position: relative; margin: 2px 0 26px; border-radius: 18px;
+  border: 1px solid var(--border2);
+  background:
+    /* «крышки» по краям (едут с контентом) — прячут тень в крайних положениях */
+    linear-gradient(to right,  var(--bg2), rgba(15,10,15,0)) 0 0 / 36px 100% no-repeat local,
+    linear-gradient(to left,   var(--bg2), rgba(15,10,15,0)) 100% 0 / 36px 100% no-repeat local,
+    /* тени-хинты (зафиксированы у краёв обёртки) — справа с красным подтоном */
+    linear-gradient(to right, rgba(0,0,0,.5), rgba(0,0,0,0)) 0 0 / 22px 100% no-repeat scroll,
+    linear-gradient(to left,  rgba(230,57,70,.32), rgba(0,0,0,0)) 100% 0 / 26px 100% no-repeat scroll;
+  background-color: var(--bg2);
+  scrollbar-width: thin; scrollbar-color: var(--accent-d) transparent;
+}
+.pricing-table-wrap::-webkit-scrollbar { height: 8px; }
+.pricing-table-wrap::-webkit-scrollbar-track { background: transparent; }
+.pricing-table-wrap::-webkit-scrollbar-thumb {
+  background: var(--accent-d); border-radius: 6px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.pricing-table {
+  width: 100%; min-width: 460px; border-collapse: separate; border-spacing: 0;
+  /* прозрачные ячейки → скролл-тени обёртки видны на краях */
+  background: transparent; font-variant-numeric: tabular-nums;
+}
+
+/* Заголовки столбцов: дни крупно, имя плана — мелко и приглушённо */
+.pricing-table thead th {
+  padding: 16px 18px; text-align: center; vertical-align: bottom;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(230,57,70,.08), transparent);
+}
+.pt-corner {
+  text-align: left !important; font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text3);
+  position: sticky; left: 0; z-index: 3; background: var(--bg2) !important;
+  border-right: 1px solid var(--border2);
+}
+.pt-col .pt-days {
+  display: block; font-size: 17px; font-weight: 800; color: var(--text);
+  line-height: 1.1; white-space: nowrap;
+}
+.pt-col .pt-plan {
+  display: block; margin-top: 4px; font-size: 11px; font-weight: 600;
+  color: var(--text2); white-space: nowrap;
+}
+
+/* Тело: первый столбец приклеен (position:sticky;left:0), ячейки выровнены */
+.pt-row .pt-tool {
+  position: sticky; left: 0; z-index: 2; text-align: left;
+  padding: 14px 18px; background: var(--bg2);
+  border-right: 1px solid var(--border2);
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.pt-tool-name { display: block; font-size: 14.5px; font-weight: 700; color: var(--text); }
+.pt-tool-sub  { display: block; margin-top: 2px; font-size: 11.5px; color: var(--text2); }
+.pt-cell {
+  padding: 14px 18px; text-align: center; white-space: nowrap;
+  font-size: 15px; font-weight: 700; color: var(--text);
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.pt-row:last-child .pt-tool, .pt-row:last-child .pt-cell { border-bottom: none; }
+.pt-row:hover .pt-cell { background: rgba(255,255,255,.03); }
+
+/* Строка Комбо = «выгода»: accent-подложка + рамка + бейдж «Выгодно» */
+.pt-combo .pt-cell {
+  background: rgba(230,57,70,.10);
+  box-shadow: inset 0 1px 0 rgba(230,57,70,.35), inset 0 -1px 0 rgba(230,57,70,.35);
+  color: #fff;
+}
+.pt-combo .pt-tool {
+  /* accent-тинт поверх непрозрачного bg2 — sticky-ячейка остаётся плотной */
+  background: linear-gradient(rgba(230,57,70,.18), rgba(230,57,70,.18)), var(--bg2);
+  box-shadow: inset 0 1px 0 rgba(230,57,70,.35), inset 0 -1px 0 rgba(230,57,70,.35);
+  border-right-color: var(--border);
+}
+.pt-combo .pt-tool-name { color: var(--accent-b); }
+.pt-combo .pt-tool::after {
+  content: 'Выгодно'; display: inline-block; margin-top: 7px;
+  font-size: 9.5px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+  color: #fff; padding: 2px 8px; border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-d));
+  box-shadow: 0 4px 12px -4px rgba(230,57,70,.7);
+}
+.pt-row:hover.pt-combo .pt-cell { background: rgba(230,57,70,.14); }
+
+/* ── ЗАДАЧА 3b. Блок Publisher: Free / Pro карточки (без CTA) ── */
+.pub-plans { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 14px; }
+.pub-plan {
+  position: relative; display: flex; flex-direction: column; gap: 4px;
+  padding: 16px; border-radius: 14px;
+  background: var(--glass2); border: 1px solid var(--border2);
+}
+.pub-plan-name {
+  font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--text2);
+}
+.pub-plan-price { font-size: 22px; font-weight: 900; color: var(--text); line-height: 1.1; }
+.pub-plan-price small { font-size: 13px; font-weight: 700; color: var(--text2); }
+.pub-plan-note { font-size: 12px; color: var(--text3); line-height: 1.4; }
+.pub-plan-pro {
+  border-color: var(--border);
+  background: linear-gradient(160deg, rgba(230,57,70,.12), var(--glass2) 60%);
+}
+.pub-plan-pro .pub-plan-name { color: var(--accent-b); }
+.pub-plan-pro .pub-plan-price small { color: var(--accent-b); }
+@media (max-width: 480px) { .pub-plans { grid-template-columns: 1fr; } }
+
+/* ── ЗАДАЧА 3c. «Рекомендации по работе» (.ad-tips) — чек-лист-советы ──
+   Отличаем от «Как начать» (нумерация .ad-steps) и «Как работает» (✓ .ad-list):
+   мягкая accent-подложка + маркер-«лампочка» (mask → цвет из токена --accent-b). */
+.ad-tips {
+  background: rgba(230,57,70,.05);
+  border: 1px solid var(--border2); border-left: 3px solid var(--accent);
+  border-radius: 14px; padding: 16px 18px; gap: 13px;
+}
+.ad-tips li { padding-left: 30px; }
+.ad-tips li::before {
+  content: ''; top: 1px; left: 2px; width: 18px; height: 18px;
+  border: none; border-radius: 0; background: var(--accent-b);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 21h4'/%3E%3Cpath d='M12 3a6 6 0 0 0-4 10.5c.7.7 1.1 1.5 1 2.5h6c-.1-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z'/%3E%3C/svg%3E") center / 18px no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6'/%3E%3Cpath d='M10 21h4'/%3E%3Cpath d='M12 3a6 6 0 0 0-4 10.5c.7.7 1.1 1.5 1 2.5h6c-.1-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z'/%3E%3C/svg%3E") center / 18px no-repeat;
+}

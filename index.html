@@ -415,6 +415,12 @@
     .tp-tab { padding: 9px 5px; }
     .tp-tabs { margin-left: 4px; }
   }
+
+  /* ── Нижняя скролл-анимация: пустой fixed-шелл у нижнего края ──
+     Только позиционирование (механика). Вид/наполнение — за web-design-ux;
+     прогресс прокрутки приходит в --scroll-progress из js/scrollfx.js. */
+  #scroll-anim { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1;
+    pointer-events: none; }
   </style>
 </head>
 <body>
@@ -427,6 +433,14 @@
 <!-- ════════════════ A. ВЕРХНЯЯ ПАНЕЛЬ ПРОДУКТОВ ════════════════ -->
 <!-- РЕДАКТИРУЕМО: набор продуктов-иконок и пунктов меню -->
 <header class="topbar">
+  <!-- Конвейер данных (мотив автоматизации): тонкая бегущая лента по нижней кромке.
+       Декоративно, pointer-events:none; останавливается при prefers-reduced-motion. -->
+  <div class="header-fx" aria-hidden="true">
+    <span class="hfx-rail"></span>
+    <span class="hfx-pkt"></span>
+    <span class="hfx-pkt"></span>
+    <span class="hfx-pkt"></span>
+  </div>
   <span class="tp-brand tab-btn" data-tab="home"><span>V</span><span>a</span><span>c</span><span>a</span><span>n</span><span>t</span><span>r</span><span>i</span><span>x</span></span>
 
   <nav class="tp-tabs">
@@ -892,6 +906,20 @@
 <!-- Полная карточка-страница приложения (наполняет js/appdetail.js → AppDetail.open(key)) -->
 <div id="app-detail" class="app-detail hidden" aria-hidden="true"></div>
 
+<!-- Нижняя скролл-анимация: прогресс прокрутки → автоматизация.
+     Механика (--scroll-progress) из js/scrollfx.js; визуал — ниже в css/main.css.
+     fill/runner едут по линии слева направо по мере спуска по странице. -->
+<div id="scroll-anim" aria-hidden="true">
+  <span class="sfx-track"></span>
+  <span class="sfx-fill"></span>
+  <span class="sfx-runner">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3.4"/>
+      <path d="M12 2.2v3M12 18.8v3M2.2 12h3M18.8 12h3M5 5l2.1 2.1M16.9 16.9 19 19M19 5l-2.1 2.1M7.1 16.9 5 19"/>
+    </svg>
+  </span>
+</div>
+
 <!-- ── Подвал ───────────────────────────────────────────────────────── -->
 <footer class="site-footer" style="text-align:center; padding:28px 16px; color:#6b7590; font-size:13px; border-top:1px solid rgba(255,255,255,.06); position:relative; z-index:1;">
   <div style="display:flex; flex-wrap:wrap; gap:6px 8px; justify-content:center; align-items:center; max-width:760px; margin:0 auto;">
@@ -924,7 +952,8 @@
     // читают window.APP_DATA / window.APP_KEY_BY_SLUG). pricing.js до appdetail.js.
     var files = ['js/config.js', 'js/auth.js', 'js/profile.js',
                  'js/platforms.js', 'js/appdata.js', 'js/apps.js',
-                 'js/pricing.js', 'js/appdetail.js', 'js/main.js', 'js/format.js'];
+                 'js/pricing.js', 'js/appdetail.js', 'js/main.js',
+                 'js/scrollfx.js', 'js/format.js'];
     for (var i = 0; i < files.length; i++) {
       document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');
     }

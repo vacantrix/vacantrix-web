@@ -5,6 +5,12 @@
 //     (vacantrix-platform читает те же `plans` анон-ключом).
 //   • Любой ответ может быть пустым/недоступным (headless без сети) →
 //     рендер устойчив: мягкий фолбек, страница не падает.
+//
+// Раздел HH/Avito/Комбо — ТАБЛИЦА (строки=инструменты, столбцы=длительности),
+// собранная динамически из выборки `plans` (числа не хардкодим). Publisher и
+// Биржа задач — отдельные блоки ниже таблицы. Кнопок «Оформить»/CTA нет:
+// оплата и управление подпиской — в приложении Vacantrix Platform.
+// forTool(slug) сохранён 1:1 — на нём держится рельс цены в карточке приложения.
 // =====================================================================
 
 const Pricing = (() => {
@@ -41,45 +47,115 @@ const Pricing = (() => {
       ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   }
 
-  function _price(rub) {
-    const n = Number(rub) || 0;
-    return n === 0 ? null : n.toLocaleString('ru-RU');
+  // «1 день» / «2 дня» / «5 дней» — корректное склонение.
+  function _daysWord(d) {
+    const n = Math.abs(Number(d) || 0) % 100;
+    const n1 = n % 10;
+    if (n > 10 && n < 20) return 'дней';
+    if (n1 === 1) return 'день';
+    if (n1 >= 2 && n1 <= 4) return 'дня';
+    return 'дней';
   }
 
-  // Полный период для карточки прайса.
-  function _periodLabel(days) {
-    const d = Number(days) || 0;
-    if (d === 7)   return 'на 7 дней';
-    if (d === 30)  return 'в месяц';
-    if (d === 365) return 'на год';
-    if (d && d % 30 === 0) return 'на ' + (d / 30) + ' мес.';
-    return d ? 'на ' + d + ' дн.' : '';
+  function _priceText(rub) {
+    const n = Number(rub);
+    if (!isFinite(n)) return '—';
+    return n === 0 ? 'Бесплатно' : n.toLocaleString('ru-RU') + ' ₽';
   }
 
-  function _planCard(p) {
-    const price = _price(p.price_rub);
-    const priceHtml = price
-      ? `<div class="pricing-price">${price}<span>₽</span></div>`
-      : `<div class="pricing-price pricing-free">Бесплатно</div>`;
-    const cta = price
-      ? `<a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">Оформить</a>`
-      : `<a class="btn-outline pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">Начать бесплатно</a>`;
+  // ── Модель таблицы из выборки `plans` ────────────────────────────────
+  // Строки: HH (tools.slug='vacantrix'), Avito (slug='avito'), Комбо (is_combo).
+  // Столбцы: объединение длительностей по этим строкам, по возрастанию.
+  // Подпись столбца = дни + мелкое имя плана (приоритет — не-комбо имена).
+  function _tableModel(list) {
+    const rowDefs = [
+      { key: 'vacantrix', label: 'HH',    sub: '',          combo: false, match: p => !p.is_combo && p.tools && p.tools.slug === 'vacantrix' },
+      { key: 'avito',     label: 'Avito', sub: '',          combo: false, match: p => !p.is_combo && p.tools && p.tools.slug === 'avito' },
+      { key: 'combo',     label: 'Комбо', sub: 'HH + Avito', combo: true,  match: p => !!p.is_combo },
+    ];
+    const durSet    = new Set();
+    const nameByDur = {};
+    const rows = rowDefs.map(def => {
+      const priceByDur = {};
+      list.filter(def.match).forEach(p => {
+        const d = Number(p.duration_days) || 0;
+        if (!d) return;
+        durSet.add(d);
+        priceByDur[d] = p.price_rub;
+        if (p.name && !nameByDur[d]) nameByDur[d] = p.name;  // не-комбо имена идут первыми
+      });
+      return { ...def, priceByDur };
+    }).filter(r => Object.keys(r.priceByDur).length);  // только строки с реальными ценами
+
+    const durations = Array.from(durSet).sort((a, b) => a - b);
+    return { durations, nameByDur, rows };
+  }
+
+  function _tableHtml(model) {
+    const { durations, nameByDur, rows } = model;
+
+    const head = durations.map(d => `
+      <th class="pt-col" scope="col">
+        <span class="pt-days">${d} ${_daysWord(d)}</span>
+        ${nameByDur[d] ? `<small class="pt-plan">${_esc(nameByDur[d])}</small>` : ''}
+      </th>`).join('');
+
+    const body = rows.map(r => {
+      const cells = durations.map(d => {
+        const has = Object.prototype.hasOwnProperty.call(r.priceByDur, d);
+        return `<td class="pt-cell">${has ? _esc(_priceText(r.priceByDur[d])) : '—'}</td>`;
+      }).join('');
+      return `
+        <tr class="pt-row${r.combo ? ' pt-combo' : ''}">
+          <th class="pt-tool" scope="row">
+            <span class="pt-tool-name">${_esc(r.label)}</span>
+            ${r.sub ? `<small class="pt-tool-sub">${_esc(r.sub)}</small>` : ''}
+          </th>
+          ${cells}
+        </tr>`;
+    }).join('');
+
+    // overflow-x:auto — механика горизонтальной прокрутки ВНУТРИ обёртки
+    // (узкий экран не распирает документ). Визуал доводит web-design-ux.
     return `
-      <div class="pricing-card reveal">
-        <div class="pricing-badge">${_esc(p.name || 'План')}</div>
-        ${priceHtml}
-        <div class="pricing-period">${_esc(_periodLabel(p.duration_days))}</div>
-        ${cta}
+      <div class="pricing-table-wrap reveal" role="region"
+           aria-label="Тарифы HH, Avito и Комбо" tabindex="0"
+           style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table class="pricing-table">
+          <thead>
+            <tr><th class="pt-corner" scope="col">Инструмент</th>${head}</tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
       </div>`;
   }
 
-  // Есть ли в выборке план данного инструмента (по tools.slug).
-  function _hasProduct(list, slug) {
-    return list.some(p => !p.is_combo && p.tools && p.tools.slug === slug);
+  // ── Publisher: Pro из выборки (фолбек 399) + упоминание Free, без CTA ──
+  function _publisherBlock(list) {
+    const pro = list.find(p => !p.is_combo && p.tools && p.tools.slug === 'publisher'
+                               && Number(p.price_rub) > 0);
+    const proPrice = pro ? Number(pro.price_rub).toLocaleString('ru-RU') : '399';
+    return `
+      <div class="pricing-info pricing-publisher reveal">
+        <h3>Vacantrix Publisher</h3>
+        <p>Кросс-постинг в соцсети и доски объявлений.</p>
+        <div class="pub-plans">
+          <div class="pub-plan">
+            <span class="pub-plan-name">Free</span>
+            <span class="pub-plan-price">Бесплатно</span>
+            <span class="pub-plan-note">базовый кросс-постинг с лимитами</span>
+          </div>
+          <div class="pub-plan pub-plan-pro">
+            <span class="pub-plan-name">Pro</span>
+            <span class="pub-plan-price">${_esc(proPrice)} ₽<small> / мес</small></span>
+            <span class="pub-plan-note">без лимитов, расписание и ИИ-тексты</span>
+          </div>
+        </div>
+      </div>`;
   }
 
-  // Статический информблок «Биржа задач»: оплата напрямую исполнителю,
-  // без подписки платформы. НЕ заявляем удержание денег.
+  // ── Биржа задач: оплата напрямую исполнителю, без подписки платформы.
+  //     НЕ заявляем удержание денег. ──
   function _tasksBlock() {
     return `
       <div class="pricing-info reveal">
@@ -89,82 +165,33 @@ const Pricing = (() => {
       </div>`;
   }
 
-  // Фолбек-прайс Publisher (Free / Pro) — только если его нет в выборке `plans`.
-  function _publisherBlock() {
-    return `
-      <div class="pricing-group reveal">
-        <h3 class="pricing-group-title">Vacantrix Publisher</h3>
-        <div class="pricing-grid">
-          <div class="pricing-card reveal">
-            <div class="pricing-badge">Free</div>
-            <div class="pricing-price pricing-free">Бесплатно</div>
-            <div class="pricing-period">базовый кросс-постинг</div>
-            <a class="btn-outline pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">Начать бесплатно</a>
-          </div>
-          <div class="pricing-card featured reveal">
-            <div class="pricing-badge popular">★ Pro</div>
-            <div class="pricing-price">399<span>₽</span></div>
-            <div class="pricing-period">в месяц</div>
-            <a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">Оформить</a>
-          </div>
-        </div>
-      </div>`;
-  }
-
   function render(plans) {
     const container = document.getElementById('pricing-content');
     if (!container) return;
 
     const list = Array.isArray(plans) ? plans : [];
-
-    // Группировка: продукты по tools.slug + отдельная группа «Комбо».
-    const groups = [];
-    const byKey = {};
-    function bucket(key, title) {
-      if (!byKey[key]) { byKey[key] = { key, title, plans: [] }; groups.push(byKey[key]); }
-      return byKey[key];
-    }
-    list.forEach(p => {
-      if (p.is_combo) { bucket('__combo', 'Комбо').plans.push(p); return; }
-      const slug  = (p.tools && p.tools.slug) || 'other';
-      // Заголовок группы — курируемое имя из APP_DATA (как на карточках),
-      // фолбек на tools.name из БД. Цифры/планы всегда из БД (источник правды).
-      const wkey  = window.APP_KEY_BY_SLUG ? window.APP_KEY_BY_SLUG[slug] : null;
-      const title = (wkey && window.APP_DATA && window.APP_DATA[wkey] && window.APP_DATA[wkey].name)
-        || (p.tools && p.tools.name)
-        || 'Подписка';
-      bucket(slug, title).plans.push(p);
-    });
+    const model = _tableModel(list);
 
     let html = '';
 
-    if (!groups.length) {
+    if (!model.rows.length) {
       // Мягкий фолбек — без выдуманных чисел (offline/headless/пустой ответ).
       html += `
         <div class="pricing-fallback reveal">
           <p>Актуальные тарифы подтянутся из каталога. Если цены не загрузились —
-          оформить и управлять подпиской можно в
-          <a href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">Telegram-боте</a>.</p>
+          оформить и управлять подпиской можно в приложении Vacantrix Platform.</p>
         </div>`;
     } else {
-      groups.forEach(g => {
-        html += `
-          <div class="pricing-group reveal">
-            <h3 class="pricing-group-title">${_esc(g.title)}</h3>
-            <div class="pricing-grid">${g.plans.map(_planCard).join('')}</div>
-          </div>`;
-      });
+      html += _tableHtml(model);
     }
 
-    // Publisher Free/Pro — статикой только если его нет в `plans` (без дубля).
-    if (!_hasProduct(list, 'publisher')) html += _publisherBlock();
-
-    // Биржа задач — всегда статический информблок (нет тарифов в `plans`).
+    // Publisher и Биржа задач — отдельные блоки НИЖЕ таблицы.
+    html += _publisherBlock(list);
     html += _tasksBlock();
 
+    // Одна общая мелкая строка-примечание — без навязчивой кнопки.
     html += `
-      <p class="pricing-note">Оплата и управление подпиской — через
-        <a href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">Telegram-бот</a></p>`;
+      <p class="pricing-note">Оплата и управление подпиской — в приложении Vacantrix Platform.</p>`;
 
     container.innerHTML = html;
     if (window._initReveal) window._initReveal();
