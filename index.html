@@ -334,31 +334,6 @@
   #planet-card .pc-badge.soon { color: var(--text3); background: rgba(255,255,255,.05); border: 1px solid var(--border2); }
   #planet-card .pc-cta { font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-d)); border-radius: 8px; padding: 6px 12px; }
 
-  /* Детальная рамка приложения (focus-режим по клику) */
-  #planet-detail { position: fixed; z-index: 1300; right: max(24px, 5vw); top: 50%;
-    transform: translateY(-50%) translateX(34px); width: 340px; max-width: calc(100vw - 32px);
-    background: var(--glass); border: 1px solid var(--accent); border-radius: 20px; padding: 24px;
-    box-shadow: 0 24px 70px -18px rgba(0,0,0,.85), 0 0 0 1px rgba(230,57,70,.3), 0 0 40px -8px rgba(230,57,70,.5);
-    backdrop-filter: var(--blur); opacity: 0; pointer-events: none;
-    transition: opacity .35s ease, transform .35s ease; }
-  #planet-detail.show { opacity: 1; transform: translateY(-50%) translateX(0); pointer-events: auto; }
-  #pd-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; border-radius: 8px;
-    background: rgba(255,255,255,.06); border: 1px solid var(--border); color: var(--text2); cursor: pointer; font-size: 14px; }
-  #pd-close:hover { color: #fff; border-color: var(--accent-b); }
-  .pd-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; padding-right: 28px; }
-  .pd-ico { width: 64px; height: 64px; border-radius: 16px; overflow: hidden; flex-shrink: 0;
-    background: linear-gradient(140deg, rgba(230,57,70,.2), rgba(0,0,0,.3)); border: 1px solid var(--border2); display: grid; place-items: center; }
-  .pd-ico img { width: 100%; height: 100%; object-fit: cover; }
-  .pd-nm { font-size: 21px; font-weight: 800; line-height: 1.15; }
-  .pd-slogan { color: var(--accent-b); font-size: 12.5px; font-weight: 600; margin: 5px 0 3px; }
-  .pd-badge { display: inline-block; margin-top: 7px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 6px; }
-  .pd-badge.live { color: #58e08a; background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3); }
-  .pd-badge.soon { color: var(--text3); background: rgba(255,255,255,.05); border: 1px solid var(--border2); }
-  .pd-desc { color: var(--text2); font-size: 14.5px; line-height: 1.6; margin-bottom: 20px; }
-  .pd-cta { width: 100%; padding: 13px; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; color: #fff; cursor: pointer; font-family: inherit;
-    background: linear-gradient(135deg, var(--accent), var(--accent-d)); box-shadow: 0 8px 28px -6px rgba(230,57,70,.6); }
-  .pd-cta:hover { filter: brightness(1.08); }
-
   /* ══════════ Топбар: 5 вкладок с кастомными иконками и анимациями ══════════ */
   /* вкладки занимают доступную ширину и скроллятся ВНУТРИ, а не распирают топбар
      (бренд/действия не сжимаются — flex-shrink:0; иначе на ~920–1020px был горизонтальный скролл страницы) */
@@ -439,13 +414,6 @@
     /* на самых узких ужимаем вкладки, чтобы все 5 иконок влезли без скролла */
     .tp-tab { padding: 9px 5px; }
     .tp-tabs { margin-left: 4px; }
-  }
-  @media (max-width: 760px) {
-    /* Детальная панель планеты (клик/тап) → нижний лист: ближе к пальцу, на всю ширину */
-    #planet-detail { right: 10px; left: 10px; top: auto; bottom: 10px;
-      width: auto; max-width: none; padding: 20px;
-      transform: translateY(24px); }
-    #planet-detail.show { transform: translateY(0); }
   }
   </style>
 </head>
@@ -623,27 +591,28 @@
       </div>
     </div>
 
-    <!-- ЦЕНЫ — компактный тизер (только 2D). Полный прайс — на вкладке #tab-pricing (единый источник). -->
+    <!-- ЦЕНЫ — компактный тизер (только 2D). Реальный прайс — на вкладке #tab-pricing (единый источник).
+         Без выдуманных чисел: конкретные тарифы рендерит js/pricing.js из Supabase. -->
     <div class="only-2d price-teaser">
       <div class="sec-head reveal" style="margin-top:44px">
         <h2>Простые тарифы</h2>
-        <p>Бесплатный старт, дальше — от 299 ₽/мес. Оплата за результат, без скрытых платежей.</p>
+        <p>Бесплатный старт у каждого инструмента. Дальше — гибкая подписка под задачу, без скрытых платежей.</p>
       </div>
       <div class="price-mini">
         <div class="pm-card reveal">
-          <div class="pm-name">Пробный</div>
-          <div class="pm-price">3 дня</div>
-          <div class="pm-note">бесплатно</div>
+          <div class="pm-name">Старт</div>
+          <div class="pm-price">Бесплатно</div>
+          <div class="pm-note">без карты</div>
         </div>
         <div class="pm-card reveal" style="transition-delay:.06s">
-          <div class="pm-name">Стандарт</div>
-          <div class="pm-price">299<span>₽</span></div>
-          <div class="pm-note">в месяц</div>
+          <div class="pm-name">Подписка</div>
+          <div class="pm-price">Гибко</div>
+          <div class="pm-note">под каждый инструмент</div>
         </div>
         <div class="pm-card reveal" style="transition-delay:.12s">
-          <div class="pm-name">Максимум</div>
-          <div class="pm-price">499<span>₽</span></div>
-          <div class="pm-note">в месяц</div>
+          <div class="pm-name">Биржа</div>
+          <div class="pm-price">За результат</div>
+          <div class="pm-note">оплата исполнителю</div>
         </div>
       </div>
       <div style="text-align:center">
@@ -694,54 +663,14 @@
     <div id="apps-content"><div class="spinner"></div></div>
   </div>
 
-  <!-- ── ТАРИФЫ (портировано без изменений) ── -->
+  <!-- ── ТАРИФЫ (динамически из Supabase `plans` — рендерит js/pricing.js) ── -->
   <div id="tab-pricing" class="tab-panel">
     <div class="pricing-header reveal">
       <h2>Тарифы и цены</h2>
-      <p>Автоматизируйте отклики на hh.ru — выберите подходящий план</p>
+      <p>Бесплатный старт у каждого инструмента — подписку подключаете, когда нужно больше.</p>
     </div>
-    <div class="pricing-grid">
-      <div class="pricing-card reveal" style="transition-delay:.05s">
-        <div class="pricing-badge">Пробный</div>
-        <div class="pricing-price pricing-free">3 дня</div>
-        <div class="pricing-period">бесплатно</div>
-        <ul class="pricing-features">
-          <li><span class="pf-icon">✓</span> До 30 откликов в день</li>
-          <li><span class="pf-icon">✓</span> Базовые фильтры вакансий</li>
-          <li><span class="pf-icon">✓</span> Сопроводительное письмо</li>
-          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Расширенные фильтры</span></li>
-          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Приоритетная поддержка</span></li>
-        </ul>
-        <a class="btn-outline pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Попробовать</a>
-      </div>
-      <div class="pricing-card featured reveal" style="transition-delay:.12s">
-        <div class="pricing-badge popular">★ Популярный</div>
-        <div class="pricing-price">299<span>₽</span></div>
-        <div class="pricing-period">в месяц · 2 490 ₽/год</div>
-        <ul class="pricing-features">
-          <li><span class="pf-icon">✓</span> Неограниченные отклики</li>
-          <li><span class="pf-icon">✓</span> Расширенные фильтры</li>
-          <li><span class="pf-icon">✓</span> Сопроводительное письмо</li>
-          <li><span class="pf-icon">✓</span> Автообновление приложения</li>
-          <li><span class="pf-icon dim">✗</span><span class="pf-dim">Несколько аккаунтов</span></li>
-        </ul>
-        <a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a>
-      </div>
-      <div class="pricing-card reveal" style="transition-delay:.19s">
-        <div class="pricing-badge">Максимум</div>
-        <div class="pricing-price">499<span>₽</span></div>
-        <div class="pricing-period">в месяц · 3 990 ₽/год</div>
-        <ul class="pricing-features">
-          <li><span class="pf-icon">✓</span> Всё из Стандарта</li>
-          <li><span class="pf-icon">✓</span> До 3 аккаунтов hh.ru</li>
-          <li><span class="pf-icon">✓</span> Персональная настройка</li>
-          <li><span class="pf-icon">✓</span> Поддержка 24/7</li>
-          <li><span class="pf-icon">✓</span> Ранний доступ к функциям</li>
-        </ul>
-        <a class="btn-primary pricing-btn" href="https://t.me/VacantrixB_O_T" target="_blank">Оформить</a>
-      </div>
-    </div>
-    <p class="pricing-note">Оплата и управление подпиской — через <a href="https://t.me/VacantrixB_O_T" target="_blank">Telegram-бот</a></p>
+    <!-- Pricing.loadAndRender() наполняет реальными планами; фолбек при пустом ответе -->
+    <div id="pricing-content"><div class="spinner"></div></div>
   </div>
 
   <!-- ── НАСТРОЙКИ (контейнер заполняет main.js) ── -->
@@ -950,17 +879,6 @@
   </div>
 </div>
 
-<!-- Детальная рамка приложения (клик по планете → наезд камеры + инфо) -->
-<div id="planet-detail" aria-hidden="true">
-  <button id="pd-close" aria-label="Закрыть">✕</button>
-  <div class="pd-head">
-    <span class="pd-ico"><img id="pd-img" alt=""></span>
-    <div><div class="pd-nm" id="pd-nm"></div><div class="pd-slogan" id="pd-slogan"></div><span class="pd-badge" id="pd-badge"></span></div>
-  </div>
-  <div class="pd-desc" id="pd-desc"></div>
-  <button class="pd-cta" id="pd-cta"></button>
-</div>
-
 <!-- Инфо-карточка планеты (наполняется intro3d.js при наведении на планету) -->
 <div id="planet-card" aria-hidden="true">
   <div class="pc-top">
@@ -970,6 +888,9 @@
   <div class="pc-desc" id="pc-desc"></div>
   <div class="pc-foot"><span class="pc-badge" id="pc-badge"></span><span class="pc-cta" id="pc-cta"></span></div>
 </div>
+
+<!-- Полная карточка-страница приложения (наполняет js/appdetail.js → AppDetail.open(key)) -->
+<div id="app-detail" class="app-detail hidden" aria-hidden="true"></div>
 
 <!-- ── Подвал ───────────────────────────────────────────────────────── -->
 <footer class="site-footer" style="text-align:center; padding:28px 16px; color:#6b7590; font-size:13px; border-top:1px solid rgba(255,255,255,.06); position:relative; z-index:1;">
@@ -999,8 +920,11 @@
     // Классические скрипты (без сборщика, порядок обязателен). format.js — ПОСЛЕ main.js.
     // intro3d.js (Three.js ESM) здесь НЕ грузится: его лениво импортирует format.js
     // только при включении 3D — в 2D Three.js не качается вовсе.
+    // appdata.js — ПЕРВЫМ среди потребителей (apps.js/pricing.js/appdetail.js
+    // читают window.APP_DATA / window.APP_KEY_BY_SLUG). pricing.js до appdetail.js.
     var files = ['js/config.js', 'js/auth.js', 'js/profile.js',
-                 'js/platforms.js', 'js/apps.js', 'js/main.js', 'js/format.js'];
+                 'js/platforms.js', 'js/appdata.js', 'js/apps.js',
+                 'js/pricing.js', 'js/appdetail.js', 'js/main.js', 'js/format.js'];
     for (var i = 0; i < files.length; i++) {
       document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');
     }

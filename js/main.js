@@ -457,6 +457,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ── 2. Асинхронная загрузка данных в фоне (не блокирует UI) ──────────
   (async () => {
+    // Прогреваем кэш тарифов сразу — чтобы Pricing.forTool был готов
+    // к моменту открытия карточки приложения (рельс цены).
+    if (typeof Pricing !== 'undefined') Pricing.load().catch(e => console.warn('Pricing.load:', e?.message || e));
+
     // Auth с таймаутом 5 сек — если зависнет, продолжаем без него
     try {
       await Promise.race([
@@ -483,6 +487,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // Площадки и каталог приложений — грузим ВСЕГДА, независимо от авторизации.
     try { Platforms.loadAndRender(); } catch (e) { console.warn('Platforms error:', e); }
     await Apps.loadAndRender().catch(e => console.warn('Apps error:', e));
+
+    // Тарифы — динамически из Supabase (рендер устойчив к пустому/оффлайн ответу).
+    if (typeof Pricing !== 'undefined') {
+      Pricing.loadAndRender().catch(e => console.warn('Pricing error:', e?.message || e));
+    }
 
     _initReveal();
   })();

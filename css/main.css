@@ -492,7 +492,7 @@ footer {
 .pricing-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px; align-items: start;
+  gap: 20px; align-items: stretch;
 }
 
 .pricing-card {
@@ -553,7 +553,7 @@ footer {
 .pf-icon.dim { color: var(--text3); }
 .pf-dim { color: var(--text3); }
 
-.pricing-btn { width: 100%; justify-content: center; padding: 12px; margin-top: 4px; }
+.pricing-btn { width: 100%; justify-content: center; padding: 12px; margin-top: auto; }
 
 .pricing-note {
   text-align: center; margin-top: 28px;
@@ -738,3 +738,261 @@ footer {
   .pricing-price { font-size: 36px; }
   .settings-row { flex-direction: column; align-items: flex-start; gap: 10px; }
 }
+
+/* ===================================================================
+   Динамические тарифы (группы продуктов + статические информблоки)
+   =================================================================== */
+.pricing-group { margin-bottom: 34px; }
+.pricing-group-title {
+  font-size: 18px; font-weight: 800; color: var(--text);
+  margin-bottom: 16px; display: flex; align-items: center; gap: 12px;
+}
+.pricing-group-title::after {
+  content: ''; flex: 1; height: 1px; background: var(--border2);
+}
+.pricing-info {
+  background: var(--glass); backdrop-filter: var(--blur);
+  border: 1px solid var(--border2); border-left: 3px solid var(--accent);
+  border-radius: 18px; padding: 22px 24px; margin-bottom: 26px;
+}
+.pricing-info h3 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+.pricing-info p { color: var(--text2); font-size: 14px; line-height: 1.6; }
+.pricing-info a, .pricing-fallback a { color: var(--accent-b); }
+.pricing-fallback {
+  max-width: 560px; margin: 0 auto; padding: 36px 16px;
+  text-align: center; color: var(--text2); font-size: 14.5px; line-height: 1.7;
+}
+
+/* ===================================================================
+   Полная карточка приложения (#app-detail) — фуллскрин-оверлей
+   Тёмная тема, акцент --accent. Глубокую полировку оставляем дизайнеру.
+   =================================================================== */
+body.app-detail-open { overflow: hidden; }
+
+.app-detail {
+  position: fixed; inset: 0; z-index: 1340;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 40px 20px; overflow-y: auto;
+  background: rgba(8, 5, 8, .74); backdrop-filter: blur(10px);
+  animation: adFade .2s ease;
+  scrollbar-width: thin; scrollbar-color: var(--accent-d) transparent;
+}
+.app-detail::-webkit-scrollbar { width: 10px; }
+.app-detail::-webkit-scrollbar-thumb {
+  background: var(--accent-d); border-radius: 6px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+.app-detail.hidden { display: none; }
+@keyframes adFade { from { opacity: 0; } to { opacity: 1; } }
+
+.app-detail-panel {
+  position: relative; width: 100%; max-width: 1000px; margin: auto;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 22px; padding: 28px;
+  box-shadow: var(--shadow), 0 0 0 1px rgba(230, 57, 70, .18);
+  animation: adRise .26s cubic-bezier(.2, .7, .3, 1);
+}
+@keyframes adRise {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ad-close {
+  position: absolute; top: 14px; right: 14px; z-index: 2;
+  width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+  background: rgba(255, 255, 255, .05); border: 1px solid var(--border);
+  color: var(--text2); cursor: pointer; font-size: 15px; font-family: inherit;
+  transition: color .18s, border-color .18s, background .18s;
+}
+.ad-close:hover { color: #fff; border-color: var(--accent); background: rgba(230, 57, 70, .14); }
+
+.app-detail-grid {
+  display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start;
+}
+
+/* ── Левая колонка (контент) ── */
+.ad-main { min-width: 0; }
+.ad-hero {
+  display: flex; align-items: center; gap: 18px;
+  padding: 2px 44px 22px 0; margin-bottom: 22px;
+  border-bottom: 1px solid var(--border2);
+}
+.ad-hero-ico {
+  width: 68px; height: 68px; border-radius: 18px; flex-shrink: 0; overflow: hidden;
+  display: grid; place-items: center; font-size: 30px;
+  background: linear-gradient(140deg, rgba(230, 57, 70, .2), rgba(0, 0, 0, .3));
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 32px -12px rgba(230, 57, 70, .6);
+}
+.ad-hero-ico img { width: 100%; height: 100%; object-fit: cover; }
+.ad-status {
+  display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; padding: 3px 8px; border-radius: 6px; margin-bottom: 7px;
+}
+.ad-status.live { color: #58e08a; background: rgba(46, 204, 113, .12); border: 1px solid rgba(46, 204, 113, .3); }
+.ad-status.soon { color: var(--text3); background: rgba(255, 255, 255, .05); border: 1px solid var(--border2); }
+.ad-name { font-size: clamp(22px, 3vw, 28px); font-weight: 800; line-height: 1.12; }
+.ad-tagline { color: var(--accent-b); font-size: 13.5px; font-weight: 600; margin-top: 5px; line-height: 1.4; }
+
+.ad-video {
+  border-radius: 16px; overflow: hidden; border: 1px solid var(--border2);
+  margin-bottom: 22px; background: #000; aspect-ratio: 16 / 9;
+}
+.ad-video video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.ad-section { margin-bottom: 22px; }
+.ad-section h3 {
+  font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 12px;
+  display: flex; align-items: center; gap: 10px;
+}
+.ad-section h3::before {
+  content: ''; flex-shrink: 0; width: 3px; height: 15px; border-radius: 2px;
+  background: linear-gradient(var(--accent-b), var(--accent-d));
+}
+.ad-section > p { color: var(--text2); font-size: 14.5px; line-height: 1.65; }
+
+.ad-list { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+.ad-list li { position: relative; padding-left: 28px; color: var(--text2); font-size: 14px; line-height: 1.55; }
+.ad-list li::before {
+  content: '✓'; position: absolute; left: 0; top: 1px;
+  width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 11px; font-weight: 700; color: var(--accent-b);
+  background: rgba(230, 57, 70, .12); border: 1px solid var(--border2);
+}
+
+.ad-steps { list-style: none; counter-reset: adstep; display: flex; flex-direction: column; gap: 12px; }
+.ad-steps li {
+  position: relative; padding-left: 40px; color: var(--text2);
+  font-size: 14px; line-height: 1.55; counter-increment: adstep; min-height: 26px;
+}
+.ad-steps li::before {
+  content: counter(adstep); position: absolute; left: 0; top: -1px;
+  width: 27px; height: 27px; border-radius: 8px; display: grid; place-items: center;
+  font-size: 12.5px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent-d));
+}
+
+.ad-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.ad-shot {
+  border-radius: 12px; overflow: hidden; border: 1px solid var(--border2);
+  cursor: zoom-in; aspect-ratio: 16 / 10;
+}
+.ad-shot img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s ease; }
+.ad-shot:hover img { transform: scale(1.05); }
+
+/* ── Правая колонка (рельс) ── */
+.ad-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; }
+.ad-rail-card {
+  background: var(--glass); backdrop-filter: var(--blur);
+  border: 1px solid var(--border2); border-radius: 18px; padding: 20px;
+}
+.ad-rail-label {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--accent-b); margin-bottom: 12px;
+}
+.ad-price-free { font-size: 24px; font-weight: 900; color: var(--text); }
+.ad-price-sub { color: var(--text2); font-size: 13px; line-height: 1.5; margin-top: 6px; }
+
+.ad-plan-list { display: flex; flex-direction: column; gap: 11px; }
+.ad-plan {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding-bottom: 11px; border-bottom: 1px solid rgba(255, 255, 255, .05);
+}
+.ad-plan:last-child { padding-bottom: 0; border-bottom: none; }
+.ad-plan-name { font-size: 13.5px; color: var(--text2); }
+.ad-plan-price { font-size: 17px; font-weight: 800; color: var(--text); white-space: nowrap; }
+.ad-plan-price small { font-size: 12px; font-weight: 600; color: var(--text3); }
+
+.ad-soon-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; padding: 4px 10px; border-radius: 7px; margin-bottom: 10px;
+  color: var(--text3); background: rgba(255, 255, 255, .05); border: 1px solid var(--border2);
+}
+.ad-rail-soon p { color: var(--text2); font-size: 13.5px; line-height: 1.55; }
+
+.ad-cta {
+  display: block; width: 100%; margin-top: 16px; padding: 13px 16px; text-align: center;
+  border: none; border-radius: 12px; font-family: inherit; font-size: 15px; font-weight: 700;
+  color: #fff; cursor: pointer; text-decoration: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-d));
+  box-shadow: 0 8px 26px -8px rgba(230, 57, 70, .6);
+  transition: filter .18s ease, transform .18s ease;
+}
+.ad-cta:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.ad-cta:focus-visible { outline: 2px solid var(--accent-b); outline-offset: 3px; }
+
+.ad-passport h4 {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text3); margin-bottom: 14px;
+}
+.ad-pass-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.ad-pass-row .k {
+  font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--text3);
+}
+.ad-pass-row .v {
+  display: inline-block; align-self: flex-start; max-width: 100%;
+  padding: 5px 11px; border-radius: 9px; font-size: 13px; line-height: 1.45;
+  color: var(--text); background: var(--glass2); border: 1px solid var(--border2);
+}
+.ad-features { list-style: none; display: flex; flex-direction: column; gap: 9px; }
+.ad-features li { position: relative; padding-left: 26px; font-size: 13px; color: var(--text2); line-height: 1.5; }
+.ad-features li::before {
+  content: '✓'; position: absolute; left: 0; top: 0;
+  width: 17px; height: 17px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 10px; font-weight: 700; color: var(--accent-b);
+  background: rgba(230, 57, 70, .12); border: 1px solid var(--border2);
+}
+
+/* Первая карточка рельса = «зона покупки»: accent-подложка + верхний strip */
+.ad-rail > .ad-rail-card:first-child {
+  position: relative; overflow: hidden; border-color: var(--border);
+  background: linear-gradient(160deg, rgba(230, 57, 70, .10), var(--glass) 58%);
+}
+.ad-rail > .ad-rail-card:first-child::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--accent-d), var(--accent-b));
+}
+
+/* ── Адаптив карточки ── */
+@media (max-width: 920px) {
+  .app-detail-grid { grid-template-columns: 1fr; }
+  .ad-rail { position: static; flex-direction: row; flex-wrap: wrap; }
+  .ad-rail-card { flex: 1; min-width: 240px; }
+}
+@media (max-width: 760px) {
+  .app-detail { padding: 26px 14px; }
+  .app-detail-panel { padding: 24px 22px; }
+  .ad-shots { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+}
+@media (max-width: 600px) {
+  .app-detail { padding: 0; }
+  .app-detail-panel { border-radius: 0; min-height: 100vh; padding: 22px 16px 40px; }
+  .ad-rail { flex-direction: column; gap: 12px; }
+  .ad-rail-card { min-width: 0; }
+  .ad-hero { padding-right: 40px; }
+  .ad-hero-ico { width: 56px; height: 56px; border-radius: 15px; }
+}
+@media (max-width: 420px) {
+  .app-detail-panel { padding: 20px 14px 36px; }
+  .ad-hero { gap: 14px; padding-right: 38px; }
+  .ad-hero-ico { width: 50px; height: 50px; border-radius: 13px; font-size: 24px; }
+  .ad-name { font-size: 21px; }
+  .ad-rail-card { padding: 18px; }
+  .ad-shots { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* Доступность: уважаем prefers-reduced-motion (вход оверлея, hover, reveal) */
+@media (prefers-reduced-motion: reduce) {
+  .app-detail, .app-detail-panel, .ad-cta, .ad-shot img,
+  .pricing-card, .reveal { animation: none !important; transition: none !important; }
+  .ad-cta:hover, .pricing-card:hover { transform: none !important; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
+
+/* Модалки и лайтбокс должны лежать ВЫШЕ карточки приложения (#app-detail = 1340)
+   и выше липкого топбара (1200) — иначе логин/гид установки/скрин уезжают за неё. */
+.modal-overlay { z-index: 1400; }
+#lightbox { z-index: 1400; }
+
+/* Клик по карточке приложения (2D) открывает полную карточку */
+.app-card { cursor: pointer; }

@@ -126,6 +126,7 @@ const Apps = (() => {
             </div>` : ''}
         </div>` : ''}
     `;
+    _wireDetail(el, app.slug);
     return el;
   }
 
@@ -150,7 +151,30 @@ const Apps = (() => {
           : ''}
       </div>
     `;
+    _wireDetail(el, app.slug);
     return el;
+  }
+
+  // ── Клик по карточке → полная карточка (AppDetail) ───────────────────
+  // Внутренние контролы (кнопки/ссылки/скриншоты/видео) НЕ открывают деталь.
+  function _wireDetail(el, slug) {
+    el.addEventListener('click', e => {
+      if (e.target.closest('button, a, video, input, .screenshot-item, .screenshots-nav')) return;
+      const key = (window.APP_KEY_BY_SLUG && window.APP_KEY_BY_SLUG[slug]) || slug;
+      if (typeof AppDetail !== 'undefined' && window.APP_DATA && window.APP_DATA[key]) {
+        AppDetail.open(key);
+      }
+    });
+  }
+
+  // Поиск записи web_apps по website-key (для рельса цены/CTA в AppDetail).
+  // web_apps.slug может совпадать с website-key напрямую или с tools.slug.
+  function appByKey(key) {
+    if (!key || !Array.isArray(_cachedApps)) return null;
+    return _cachedApps.find(a => a.slug === key)
+        || _cachedApps.find(a =>
+             ((window.APP_KEY_BY_SLUG && window.APP_KEY_BY_SLUG[a.slug]) || a.slug) === key)
+        || null;
   }
 
   // ── Лайтбокс ────────────────────────────────────────────────────────
@@ -254,5 +278,7 @@ const Apps = (() => {
     if (window._initReveal) window._initReveal();
   }
 
-  return { loadAndRender, rerender, openLightbox, lbPrev, lbNext, lbClose, scrollTo, startDownload };
+  return { loadAndRender, rerender, openLightbox, lbPrev, lbNext, lbClose, scrollTo, startDownload, appByKey };
 })();
+
+window.Apps = Apps;

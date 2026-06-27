@@ -750,17 +750,15 @@ export function start(opts) {
   function skipIntro() { if (phase === 'intro') enterIdle(); }
   function onKey(e) {
     if (e.key !== 'Escape') return;
-    if (focusTarget) setFocus(null); else skipIntro();   // Escape: выйти из фокуса или пропустить интро
+    skipIntro();                                         // Escape: пропустить интро (карточку закрывает сам AppDetail)
   }
-  // Клик: по планете — фокус; мимо планеты при фокусе — закрыть.
+  // Клик по планете → полная карточка-страница приложения (общий модуль AppDetail).
   function onClick(e) {
     if (phase !== 'idle') return;
     if (wasDrag) { wasDrag = false; return; }          // это было вращение, а не клик
-    if (e.target && e.target.closest && e.target.closest('#planet-detail')) return; // клики по рамке — мимо
-    const inHero = e.target && e.target.closest && e.target.closest('.planet-hero');
-    const picked = inHero ? pickAt(e.clientX, e.clientY) : null;
-    if (picked) setFocus(picked);
-    else if (focusTarget) setFocus(null);
+    if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
+    const picked = pickAt(e.clientX, e.clientY);
+    if (picked && window.AppDetail && window.AppDetail.open) window.AppDetail.open(picked.key);
   }
 
   // ── Наведение на планету: красная обводка + инфо-карточка ─────────────
@@ -783,36 +781,6 @@ export function start(opts) {
     pc.badge.textContent = d.badge; pc.badge.className = 'pc-badge ' + (d.live ? 'live' : 'soon');
     pc.badge.style.display = d.badge ? '' : 'none';
     if (pc.cta) pc.cta.style.display = 'none';     // запуск убран — всё через лаунчер
-  }
-
-  // ── Детальная рамка (focus-режим по клику) ────────────────────────────
-  const detailEl = document.getElementById('planet-detail');
-  const pd = detailEl ? {
-    img: document.getElementById('pd-img'), nm: document.getElementById('pd-nm'),
-    slogan: document.getElementById('pd-slogan'),
-    badge: document.getElementById('pd-badge'), desc: document.getElementById('pd-desc'),
-    cta: document.getElementById('pd-cta'),
-  } : null;
-  function fillDetail(key) {
-    if (!pd) return;
-    const d = cardData(key);
-    if (pd.img) pd.img.src = d.icon || ICON[key] || '';
-    pd.nm.textContent = d.name;
-    if (pd.slogan) { pd.slogan.textContent = d.slogan; pd.slogan.style.display = d.slogan ? '' : 'none'; }
-    pd.badge.textContent = d.badge || (d.live ? 'Работает' : 'Скоро');
-    pd.badge.className = 'pd-badge ' + (d.live ? 'live' : 'soon');
-    pd.desc.textContent = d.detail || d.desc || d.sub || '';     // длинное описание от агента
-    pd.cta.textContent = d.live ? 'Скачать Vacantrix Platform' : 'Узнать первым';
-  }
-  function setFocus(entry) {
-    focusTarget = entry || null;
-    if (entry) {
-      setHover(null);
-      fillDetail(entry.key);
-      if (detailEl) detailEl.classList.add('show');
-    } else if (detailEl) {
-      detailEl.classList.remove('show');
-    }
   }
 
   function setHover(entry) {
@@ -1043,15 +1011,6 @@ export function start(opts) {
     else if (paused) { paused = false; last = 0; if (running) raf = requestAnimationFrame(frame); }
   }
 
-  // ── Именованные обработчики кнопок рамки детали (снимаемы в dispose) ───
-  function onPdClose() { setFocus(null); }
-  function onPdCta() {
-    const k = focusTarget && focusTarget.key;
-    const live = k ? cardData(k).live : true;
-    if (live) document.getElementById('hero-platform-dl')?.click();          // скачать лаунчер
-    else window.open('https://t.me/VacantrixB_O_T', '_blank', 'noopener');   // «Узнать первым»
-  }
-
   // ── Подцепка/снятие ВСЕХ слушателей (pause/resume/dispose) ─────────────
   function on(target, type, fn, opts) {
     target.addEventListener(type, fn, opts);
@@ -1075,10 +1034,6 @@ export function start(opts) {
     const bar = document.querySelector('.topbar');
     if (bar) on(bar, 'click', skipIntro, true);
     on(document, 'keydown', onKey);
-    const pdClose = document.getElementById('pd-close');
-    if (pdClose) on(pdClose, 'click', onPdClose);
-    const pdCta = document.getElementById('pd-cta');
-    if (pdCta) on(pdCta, 'click', onPdCta);
   }
   function detach() {
     if (!_attached) return;
