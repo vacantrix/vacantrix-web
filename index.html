@@ -115,7 +115,7 @@
   /* ── C. Главная-«экосистема» (#tab-home) ── */
   .eco-head { text-align: center; padding: 30px 16px 4px; }
   .eco-head .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--accent-b); }
-  .eco-head h1 { font-size: clamp(26px, 4.4vw, 40px); font-weight: 900; letter-spacing: -.02em; margin: 12px 0 8px;
+  .eco-head h1 { font-size: clamp(28px, 4.8vw, 44px); font-weight: 900; letter-spacing: -.02em; margin: 12px 0 8px;
     background: linear-gradient(120deg, #fff 36%, var(--accent-b)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
   .eco-head p { color: var(--text2); font-size: 15px; max-width: 520px; margin: 0 auto; line-height: 1.55; }
 
@@ -218,6 +218,101 @@
 
   body.planets-on .site-footer { position: relative; background: var(--bg); }
 
+  /* ══════════ Два формата: 2D-лендинг (дефолт) ⇄ 3D-планеты (body.mode-3d) ══════════
+     mode-3d ставит ТОЛЬКО js/format.js. Его отсутствие = классический 2D-лендинг,
+     отрисованный сразу (без чёрной вуали интро). planets-on остаётся внутренним
+     флагом intro3d («сцена жива»), его ставит сам intro3d. */
+
+  /* 2D: прячем интро-хром — никакого чёрного старта */
+  body:not(.mode-3d) #intro-veil,
+  body:not(.mode-3d) #intro-canvas,
+  body:not(.mode-3d) #intro-skip { display: none !important; }
+
+  /* 2D: карточки экосистемы ВИДНЫ (в 3D их раскрывает интро через .shown) */
+  body:not(.mode-3d) .eco-core,
+  body:not(.mode-3d) .eco-node {
+    position: static; transform: none !important; width: auto;
+    opacity: 1 !important; filter: none !important;
+  }
+  body:not(.mode-3d) .eco-node.is-soon { opacity: .92 !important; }   /* «скоро» — чуть приглушены */
+
+  /* 2D: карточки-узлы приподнимаются на hover (ритм как у .app-card/.info-card) */
+  body:not(.mode-3d) .eco-node { cursor: default;
+    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+  body:not(.mode-3d) .eco-node:hover { transform: translateY(-5px) !important; border-color: var(--accent);
+    box-shadow: 0 18px 42px -16px rgba(0,0,0,.7), 0 0 0 1px rgba(230,57,70,.22); }
+
+  /* 2D: сетка продуктов вместо радиальной раскладки */
+  body:not(.mode-3d) .eco-stage {
+    position: static; height: auto; max-width: 1080px; margin: 26px auto 0;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: start;
+  }
+  /* Platform — «ядро» экосистемы: широкая полоса-баннер сверху сетки (иконка слева, текст справа) */
+  body:not(.mode-3d) .eco-core { grid-column: 1 / -1; display: flex; align-items: center; gap: 18px;
+    text-align: left; padding: 16px 22px; margin-bottom: 4px; border-radius: 18px;
+    background: linear-gradient(120deg, rgba(230,57,70,.14), var(--glass)); border: 1px solid var(--border); }
+  body:not(.mode-3d) .eco-core .disc { width: 60px; height: 60px; margin: 0; border-radius: 16px; flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(230,57,70,.25), 0 14px 36px -12px rgba(230,57,70,.6); }
+  body:not(.mode-3d) .eco-core .nm { font-size: 16px; }
+  body:not(.mode-3d) .eco-core .nm small { margin-top: 3px; }
+  @media (max-width: 920px) { body:not(.mode-3d) .eco-stage { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 760px) { body:not(.mode-3d) .eco-stage { grid-template-columns: repeat(2, 1fr); max-width: 520px; } }
+  @media (max-width: 420px) { body:not(.mode-3d) .eco-stage { grid-template-columns: 1fr; max-width: 340px; } }
+
+  /* Новые секции лендинга (возможности/цены-тизер/доверие) — только в 2D */
+  body.mode-3d .only-2d { display: none !important; }
+
+  /* ── Переключатель формата (#format-toggle) — сегмент-пилюля ── */
+  .fmt-toggle { display: inline-flex; align-items: center; gap: 2px; padding: 3px; flex-shrink: 0;
+    background: var(--glass2); border: 1px solid var(--border2); border-radius: 999px; margin-right: 8px; }
+  .fmt-btn { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    min-width: 34px; height: 30px; padding: 0 13px; border: none; border-radius: 999px;
+    background: transparent; color: var(--text2); font-family: inherit; font-size: 12.5px; font-weight: 700;
+    letter-spacing: .01em; cursor: pointer; white-space: nowrap;
+    transition: color .18s ease, background .18s ease, box-shadow .18s ease; }
+  .fmt-ic { display: inline-grid; place-items: center; width: 16px; height: 16px; flex-shrink: 0; }
+  .fmt-ic svg { width: 100%; height: 100%; }
+  .fmt-btn:hover:not(:disabled):not(.active) { color: var(--text); background: rgba(255,255,255,.06); }
+  .fmt-btn.active { color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-d));
+    box-shadow: 0 4px 14px -4px rgba(230,57,70,.6); }
+  .fmt-btn:disabled, .fmt-btn.fmt-disabled { opacity: .4; cursor: not-allowed; }
+  /* спиннер загрузки 3D: контент скрыт, кружок по центру кнопки */
+  .fmt-toggle.fmt-loading .fmt-btn[data-format="3d"] { color: transparent; }
+  .fmt-toggle.fmt-loading .fmt-btn[data-format="3d"] .fmt-ic,
+  .fmt-toggle.fmt-loading .fmt-btn[data-format="3d"] .fmt-lbl { opacity: 0; }
+  .fmt-toggle.fmt-loading .fmt-btn[data-format="3d"]::after { content: ''; position: absolute;
+    top: 50%; left: 50%; margin: -7px 0 0 -7px; width: 13px; height: 13px;
+    border: 2px solid rgba(255,255,255,.45); border-top-color: #fff;
+    border-radius: 50%; animation: spin .7s linear infinite; }
+  @media (max-width: 920px) { .fmt-lbl { display: none; } .fmt-btn { padding: 0 9px; } }
+
+  /* ── Тизер цен (2D) ── */
+  .price-teaser { max-width: 980px; margin: 8px auto 0; }
+  .price-mini { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 6px; }
+  .price-mini .pm-card { background: var(--glass); border: 1px solid var(--border2); border-radius: 16px;
+    padding: 18px; text-align: center; }
+  .price-mini .pm-name { font-size: 13px; font-weight: 700; color: var(--text2); }
+  .price-mini .pm-price { font-size: 26px; font-weight: 900; margin: 6px 0 2px; }
+  .price-mini .pm-price span { font-size: 15px; font-weight: 700; color: var(--text2); }
+  .price-mini .pm-note { font-size: 12px; color: var(--text3); }
+  .price-mini-all { display: inline-block; margin-top: 18px; color: var(--accent-b); font-weight: 700;
+    font-size: 14px; background: transparent; border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 18px; cursor: pointer; font-family: inherit; }
+  .price-mini-all:hover { border-color: var(--accent); color: #fff; }
+  @media (max-width: 600px) { .price-mini { grid-template-columns: 1fr; } }
+
+  /* ── Блок доверия (2D) ── */
+  .trust-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; max-width: 980px; margin: 4px auto 0; }
+  .trust-card { background: var(--glass); border: 1px solid var(--border2); border-radius: 16px;
+    padding: 16px 14px; text-align: center; }
+  .trust-card .tc-ic { width: 36px; height: 36px; border-radius: 10px; margin: 0 auto 10px; display: grid; place-items: center;
+    background: linear-gradient(140deg, rgba(230,57,70,.2), rgba(0,0,0,.25)); border: 1px solid var(--border2); color: var(--accent-b); }
+  .trust-card .tc-ic svg { width: 20px; height: 20px; }
+  .trust-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .trust-card p { font-size: 12px; color: var(--text2); line-height: 1.45; }
+  @media (max-width: 760px) { .trust-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 420px) { .trust-grid { grid-template-columns: 1fr; } }
+
   #planet-card { position: fixed; z-index: 1250; left: 0; top: 0; width: 232px; pointer-events: none;
     background: var(--glass); border: 1px solid var(--accent); border-radius: 16px; padding: 14px;
     box-shadow: 0 18px 50px -14px rgba(0,0,0,.8), 0 0 0 1px rgba(230,57,70,.28), 0 0 26px -6px rgba(230,57,70,.5);
@@ -265,8 +360,12 @@
   .pd-cta:hover { filter: brightness(1.08); }
 
   /* ══════════ Топбар: 5 вкладок с кастомными иконками и анимациями ══════════ */
-  .tp-tabs { display: flex; align-items: center; gap: 2px; margin-left: 16px; }
-  .tp-tab { position: relative; display: inline-flex; align-items: center; gap: 8px;
+  /* вкладки занимают доступную ширину и скроллятся ВНУТРИ, а не распирают топбар
+     (бренд/действия не сжимаются — flex-shrink:0; иначе на ~920–1020px был горизонтальный скролл страницы) */
+  .tp-tabs { display: flex; align-items: center; gap: 2px; margin-left: 16px; min-width: 0;
+    overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .tp-tabs::-webkit-scrollbar { display: none; }
+  .tp-tab { position: relative; flex-shrink: 0; display: inline-flex; align-items: center; gap: 8px;
     background: transparent; border: none; color: var(--text2); font-family: inherit;
     font-size: 14px; font-weight: 600; padding: 9px 13px; border-radius: 11px; cursor: pointer;
     transition: color .2s ease, background .2s ease; }
@@ -387,6 +486,18 @@
 
   <!-- Действия входа/профиля — DOM сохранён 1:1, чтобы auth.js/main.js работали без правок -->
   <div class="navbar-actions tp-actions">
+    <!-- Переключатель формата (БЕЗ класса tab-btn — иначе main.js перехватит как вкладку).
+         Логику биндит js/format.js; кнопка 3D глушится при отсутствии WebGL/reduced-motion. -->
+    <div id="format-toggle" class="fmt-toggle" role="group" aria-label="Формат сайта">
+      <button type="button" class="fmt-btn active" data-format="2d" title="Классический вид" aria-pressed="true">
+        <span class="fmt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="5" rx="1.6"/><rect x="4" y="11.5" width="16" height="3" rx="1.2"/><rect x="4" y="17" width="9.5" height="3" rx="1.2"/></svg></span>
+        <span class="fmt-lbl">Обычный</span>
+      </button>
+      <button type="button" class="fmt-btn" data-format="3d" title="3D-планеты" aria-pressed="false">
+        <span class="fmt-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-26 12 12)"/></svg></span>
+        <span class="fmt-lbl">3D</span>
+      </button>
+    </div>
     <span id="user-chip" class="user-chip tab-btn hidden" data-tab="settings" title="Настройки профиля" style="cursor:pointer">
       <span id="nav-avatar" class="avatar avatar-sm">
         <img id="nav-avatar-img" alt="" class="hidden">
@@ -420,7 +531,51 @@
       <p>В центре — Vacantrix Platform, вокруг — инструменты, которые делают рутину за вас.</p>
     </div>
 
-    <!-- РЕДАКТИРУЕМО: ядро и карточки продуктов экосистемы -->
+    <!-- HERO-CTA: #hero-platform-dl поднят в герой (id сохранён 1:1 — main.js вешает гид установки).
+         Виден в обоих форматах: в 3D — призыв под планетами, в 2D — герой-кнопка. -->
+    <div class="eco-foot">
+      <button class="btn-download" id="hero-platform-dl">
+        <span class="dl-icon">🖥</span>
+        <div class="dl-text">
+          <span class="dl-title">Скачать Vacantrix Platform</span>
+          <span class="dl-sub">Бесплатно · Windows · Без установки</span>
+        </div>
+        <span class="dl-arrow">↓</span>
+      </button>
+      <div class="hint">Все инструменты — в одном окне. Установите лаунчер, остальное запускается из него.</div>
+    </div>
+
+    <!-- ВОЗМОЖНОСТИ (только 2D-лендинг) -->
+    <div class="only-2d">
+      <div class="sec-head reveal" style="margin-top:34px">
+        <h2>Почему Vacantrix</h2>
+        <p>Инструменты, которые берут рутину на себя — и работают вместе, а не порознь.</p>
+      </div>
+      <div class="info-grid">
+        <div class="info-card reveal">
+          <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>
+          <h3>Автоматизация рутины</h3>
+          <p>Боты откликаются на вакансии и публикуют посты, пока вы заняты важным.</p>
+        </div>
+        <div class="info-card reveal" style="transition-delay:.06s">
+          <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="5"/><circle cx="15" cy="12" r="5"/></svg></span>
+          <h3>Единая экосистема</h3>
+          <p>Один аккаунт и один лаунчер на все инструменты — общий профиль и баланс.</p>
+        </div>
+        <div class="info-card reveal" style="transition-delay:.12s">
+          <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4 3 6.5 7 9 4-2.5 7-5 7-9V6z"/></svg></span>
+          <h3>Локально и приватно</h3>
+          <p>Где возможно — всё работает на вашем ПК. Ваши данные остаются вашими.</p>
+        </div>
+      </div>
+
+      <div class="sec-head reveal" style="margin-top:40px">
+        <h2>Инструменты экосистемы</h2>
+        <p>Рабочие сегодня и будущие — каждый закрывает свою рутину.</p>
+      </div>
+    </div>
+
+    <!-- РЕДАКТИРУЕМО: ядро и карточки продуктов экосистемы (единый источник для 2D-сетки и 3D-планет) -->
     <div class="eco-stage" id="eco-stage">
       <!-- ЯДРО -->
       <div class="eco-core" data-key="platform" data-slogan="Все инструменты в одном окне" data-detail="Единая точка входа в экосистему Vacantrix: один аккаунт, оплата и управление подпиской, скачивание и запуск любого инструмента без лишних шагов. Всё под рукой — с первого клика.">
@@ -468,17 +623,63 @@
       </div>
     </div>
 
-    <div class="eco-foot">
-      <!-- #hero-platform-dl сохранён: main.js вешает на него гид установки -->
-      <button class="btn-download" id="hero-platform-dl">
-        <span class="dl-icon">🖥</span>
-        <div class="dl-text">
-          <span class="dl-title">Скачать Vacantrix Platform</span>
-          <span class="dl-sub">Бесплатно · Windows · Без установки</span>
+    <!-- ЦЕНЫ — компактный тизер (только 2D). Полный прайс — на вкладке #tab-pricing (единый источник). -->
+    <div class="only-2d price-teaser">
+      <div class="sec-head reveal" style="margin-top:44px">
+        <h2>Простые тарифы</h2>
+        <p>Бесплатный старт, дальше — от 299 ₽/мес. Оплата за результат, без скрытых платежей.</p>
+      </div>
+      <div class="price-mini">
+        <div class="pm-card reveal">
+          <div class="pm-name">Пробный</div>
+          <div class="pm-price">3 дня</div>
+          <div class="pm-note">бесплатно</div>
         </div>
-        <span class="dl-arrow">↓</span>
-      </button>
-      <div class="hint">Все инструменты — в одном окне. Установите лаунчер, остальное запускается из него.</div>
+        <div class="pm-card reveal" style="transition-delay:.06s">
+          <div class="pm-name">Стандарт</div>
+          <div class="pm-price">299<span>₽</span></div>
+          <div class="pm-note">в месяц</div>
+        </div>
+        <div class="pm-card reveal" style="transition-delay:.12s">
+          <div class="pm-name">Максимум</div>
+          <div class="pm-price">499<span>₽</span></div>
+          <div class="pm-note">в месяц</div>
+        </div>
+      </div>
+      <div style="text-align:center">
+        <!-- tab-btn → main.js переключает на вкладку «Тарифы» (без дубля прайса) -->
+        <button type="button" class="price-mini-all tab-btn" data-tab="pricing">Все тарифы →</button>
+      </div>
+    </div>
+
+    <!-- ДОВЕРИЕ (только 2D) -->
+    <div class="only-2d">
+      <div class="sec-head reveal" style="margin-top:44px">
+        <h2>Почему нам доверяют</h2>
+        <p>Прозрачно и под контролем — без лишних обещаний.</p>
+      </div>
+      <div class="trust-grid">
+        <div class="trust-card reveal">
+          <span class="tc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg></span>
+          <h4>Локально на ПК</h4>
+          <p>Инструменты работают на вашем компьютере, а не «в облаке».</p>
+        </div>
+        <div class="trust-card reveal" style="transition-delay:.05s">
+          <span class="tc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5 11 4v8H3zM13 3.7 21 2.5V12h-8zM3 12h8v8l-8-1.5zM13 12h8v9.5L13 20z"/></svg></span>
+          <h4>Windows</h4>
+          <p>Скачал и запустил — без сложной установки.</p>
+        </div>
+        <div class="trust-card reveal" style="transition-delay:.1s">
+          <span class="tc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4 3 11l6 2 2 6 3-4 4 3 3-14z"/></svg></span>
+          <h4>Поддержка в Telegram</h4>
+          <p>Вопросы по подписке, оплате и работе ботов — в чате.</p>
+        </div>
+        <div class="trust-card reveal" style="transition-delay:.15s">
+          <span class="tc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4 3 6.5 7 9 4-2.5 7-5 7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
+          <h4>Оплата за результат</h4>
+          <p>На бирже задач деньги удерживаются до выполнения.</p>
+        </div>
+      </div>
     </div>
     </section>
   </div>
@@ -643,6 +844,18 @@
         <input type="checkbox" id="auth-remember">
         <label for="auth-remember">Запомнить меня на этом устройстве</label>
       </div>
+      <div id="consent-row" class="form-check" style="display:none; align-items:flex-start; gap:8px; margin-top:4px;">
+        <input type="checkbox" id="auth-consent" style="margin-top:3px;">
+        <label for="auth-consent" style="font-size:12.5px; line-height:1.5;">Я принимаю
+          <a href="offer.html" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#5aa0ff;">Публичную оферту</a>,
+          <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#5aa0ff;">Политику ПДн</a> и даю
+          <a href="consent.html" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#5aa0ff;">согласие на обработку персональных данных</a>.</label>
+      </div>
+      <div id="marketing-row" class="form-check" style="display:none; align-items:flex-start; gap:8px; margin-top:6px;">
+        <input type="checkbox" id="auth-marketing" style="margin-top:3px;">
+        <label for="auth-marketing" style="font-size:12.5px; line-height:1.5; color:#8893b0;">Хочу получать новости и предложения Vacantrix
+          <a href="consent.html" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:#5aa0ff;">(согласие на рассылку)</a>. Необязательно.</label>
+      </div>
       <p id="auth-error" class="form-error"></p>
       <div class="form-actions">
         <button id="auth-submit" type="button" class="btn-primary" data-mode="login">Войти</button>
@@ -760,43 +973,37 @@
 
 <!-- ── Подвал ───────────────────────────────────────────────────────── -->
 <footer class="site-footer" style="text-align:center; padding:28px 16px; color:#6b7590; font-size:13px; border-top:1px solid rgba(255,255,255,.06); position:relative; z-index:1;">
-  <a href="terms.html" style="color:#8893b0; text-decoration:none;">Пользовательское соглашение</a>
-  <span style="margin:0 8px;">·</span>
-  <a href="privacy.html" style="color:#8893b0; text-decoration:none;">Политика конфиденциальности</a>
-  <span style="margin:0 8px;">·</span>
-  <span>© Vacantrix</span>
+  <div style="display:flex; flex-wrap:wrap; gap:6px 8px; justify-content:center; align-items:center; max-width:760px; margin:0 auto;">
+    <a href="offer.html" style="color:#8893b0; text-decoration:none;">Публичная оферта</a>
+    <span>·</span>
+    <a href="privacy.html" style="color:#8893b0; text-decoration:none;">Политика обработки ПДн</a>
+    <span>·</span>
+    <a href="consent.html" style="color:#8893b0; text-decoration:none;">Согласия</a>
+    <span>·</span>
+    <a href="payment.html" style="color:#8893b0; text-decoration:none;">Оплата и возврат</a>
+    <span>·</span>
+    <a href="requisites.html" style="color:#8893b0; text-decoration:none;">Реквизиты</a>
+    <span>·</span>
+    <span>© Vacantrix</span>
+  </div>
 </footer>
 
 <!-- ════════════════════════════════════════════════════════════════════
-     Скрипты (порядок обязателен). 3D-интро (intro3d.js) — ESM-модуль, грузится отдельно.
+     Скрипты (порядок обязателен). 3D-интро (intro3d.js) — ESM-модуль, грузится ЛЕНИВО из format.js при включении 3D.
 ════════════════════════════════════════════════════════════════════ -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   (function () {
     var v = Date.now();
+    window.__ASSET_V = v;            // версия ассетов — format.js ленивым import() тянет intro3d.js с тем же ?v=
+    // Классические скрипты (без сборщика, порядок обязателен). format.js — ПОСЛЕ main.js.
+    // intro3d.js (Three.js ESM) здесь НЕ грузится: его лениво импортирует format.js
+    // только при включении 3D — в 2D Three.js не качается вовсе.
     var files = ['js/config.js', 'js/auth.js', 'js/profile.js',
-                 'js/platforms.js', 'js/apps.js', 'js/main.js'];
+                 'js/platforms.js', 'js/apps.js', 'js/main.js', 'js/format.js'];
     for (var i = 0; i < files.length; i++) {
       document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');
     }
-    // 3D-интро на Three.js (ES-модуль, резолвится через import map в <head>).
-    document.write('<script type="module" src="js/intro3d.js?v=' + v + '"><\/script>');
-
-    // Страховка от «чёрного экрана»: если интро не завершилось за 8 c (модуль/CDN
-    // Three.js не поднялся — частый случай на медленном мобильном интернете),
-    // принудительно показываем контент (плитки-каталог) и снимаем вуаль.
-    // Штатное интро оседает к ~6.2 c, так что обычного пользователя это не затронет.
-    setTimeout(function () {
-      if (document.body.classList.contains('intro-done')) return;
-      try {
-        var nodes = document.querySelectorAll('.eco-core, .eco-node');
-        for (var j = 0; j < nodes.length; j++) nodes[j].classList.add('shown');
-        var veil = document.getElementById('intro-veil');   if (veil) veil.classList.add('lift');
-        var cv   = document.getElementById('intro-canvas');  if (cv) cv.classList.add('done');
-        document.body.classList.remove('intro-lock', 'planets-on');
-        document.body.classList.add('intro-done');
-      } catch (e) {}
-    }, 8000);
   })();
 </script>
 

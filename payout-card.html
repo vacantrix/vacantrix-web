@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Привязка карты для выплат — Vacantrix</title>
+  <!-- Виджет данных для выплат YooKassa (токенизация карты в payout_token) -->
+  <script src="https://static.yoomoney.ru/payouts-data-widget/index.js"></script>
+  <style>
+    :root { --accent:#1a6fbd; --bg:#0b0f1e; --card:#131a2e; --txt:#dde2f0; --mut:#8893b0; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--txt);
+      font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
+    .wrap { width:100%; max-width:440px; background:var(--card);
+      border:1px solid rgba(120,150,210,.25); border-radius:16px; padding:26px 24px; }
+    h1 { font-size:19px; margin:0 0 6px; }
+    p.sub { color:var(--mut); font-size:13px; margin:0 0 18px; }
+    #payout-form { min-height:120px; }
+    .msg { margin-top:16px; font-size:13px; padding:12px 14px; border-radius:10px; display:none; }
+    .msg.ok  { display:block; background:rgba(68,204,119,.12); color:#44cc77; border:1px solid rgba(68,204,119,.4); }
+    .msg.err { display:block; background:rgba(224,85,85,.12); color:#e05555; border:1px solid rgba(224,85,85,.4); }
+    .hint { color:var(--mut); font-size:12px; margin-top:14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>💳 Карта для выплат</h1>
+    <p class="sub">Введите данные карты — на неё будут приходить выплаты по выполненным
+      задачам. Данные обрабатывает YooKassa, платформа их не видит.</p>
+    <div id="payout-form"></div>
+    <div id="msg" class="msg"></div>
+    <p class="hint">После сохранения можно вернуться в приложение Vacantrix Tasks.</p>
+  </div>
+
+  <script>
+    // ── Конфигурация ────────────────────────────────────────────────────────
+    const SUPABASE_URL  = 'https://fgcffgfyehequucnxegb.supabase.co';
+    const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZnY2ZmZ2Z5ZWhlcXV1Y254ZWdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg0ODYyMzAsImV4cCI6MjA5NDA2MjIzMH0.GrhRo_rrmpct1-gCPjznsbj4OE2Y3aWu8Q8n5rmo8Ec';
+    // ⚠️ Идентификатор шлюза выплат из ЛК YooKassa («Выплаты»). Заполнить перед боем.
+    const PAYOUT_ACCOUNT_ID = 'YOUR_PAYOUT_ACCOUNT_ID';
+
+    const msg = document.getElementById('msg');
+    function show(kind, text) { msg.className = 'msg ' + kind; msg.textContent = text; }
+
+    // Токен пользователя приходит из десктоп-приложения во фрагменте URL (#token=...).
+    function getToken() {
+      const h = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+      return h.get('token');
+    }
+    const accessToken = getToken();
+    if (!accessToken) {
+      show('err', 'Нет токена авторизации. Откройте эту страницу из приложения Vacantrix Tasks.');
+    }
+
+    async function saveCard(payoutToken, last4) {
+      try {
+        const r = await fetch(`${SUPABASE_URL}/functions/v1/tasks-payout-token-save`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': SUPABASE_ANON,
+            'Authorization': 'Bearer ' + accessToken,
+          },
+          body: JSON.stringify({ payout_token: payoutToken, last4: last4 || null }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || ('HTTP ' + r.status));
+        const paid = data.paid ? ` Запущены ожидавшие выплаты: ${data.paid}.` : '';
+        show('ok', '✓ Карта сохранена.' + paid + ' Можно вернуться в приложение.');
+      } catch (e) {
+        show('err', 'Не удалось сохранить карту: ' + e.message);
+      }
+    }
+
+    // ── Инициализация виджета выплат ────────────────────────────────────────
+    if (accessToken && window.PayoutsData) {
+      const widget = new window.PayoutsData({
+        type: 'payout',
+        account_id: PAYOUT_ACCOUNT_ID,
+        success_callback(data) {
+          // data.payout_token — синоним карты; last4 — если виджет его вернул.
+          const last4 = (data && (data.last4
+            || (data.card && data.card.last4))) || null;
+          saveCard(data.payout_token, last4);
+        },
+        error_callback(err) {
+          show('err', 'Ошибка виджета: ' + (err && err.error ? err.error : 'попробуйте ещё раз'));
+        },
+      });
+      widget.render('payout-form');
+    } else if (accessToken) {
+      show('err', 'Виджет выплат YooKassa не загрузился. Обновите страницу.');
+    }
+  </script>
+</body>
+</html>

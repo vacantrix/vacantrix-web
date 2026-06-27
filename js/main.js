@@ -352,6 +352,11 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.textContent                                 = isLogin ? 'Зарегистрироваться' : 'Войти';
     document.getElementById('switch-mode').textContent   = isLogin ? 'Уже есть аккаунт? Войти' : 'Нет аккаунта? Зарегистрироваться';
     document.getElementById('remember-row').style.display = isLogin ? 'none' : 'flex';
+    // Согласия показываем только в режиме регистрации (обратно remember-row)
+    const consentRow   = document.getElementById('consent-row');
+    const marketingRow = document.getElementById('marketing-row');
+    if (consentRow)   consentRow.style.display   = isLogin ? 'flex' : 'none';
+    if (marketingRow) marketingRow.style.display = isLogin ? 'flex' : 'none';
     if (authErr) authErr.textContent = '';
   });
 
@@ -365,7 +370,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!email || !password) { if (authErr) authErr.textContent = 'Введите email и пароль.'; return; }
     try {
       if (mode === 'register') {
-        const { needsConfirmation } = await Auth.register(email, password);
+        const consent = document.getElementById('auth-consent')?.checked ?? false;
+        if (!consent) {
+          if (authErr) authErr.textContent = 'Чтобы зарегистрироваться, примите оферту и согласие на обработку данных.';
+          return;
+        }
+        const marketing = document.getElementById('auth-marketing')?.checked ?? false;
+        const { needsConfirmation } = await Auth.register(email, password, { marketing });
         modal.classList.add('hidden');
         if (needsConfirmation) _showInfo('Письмо с подтверждением отправлено на ' + email + '.');
       } else {

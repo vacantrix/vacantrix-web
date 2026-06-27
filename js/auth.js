@@ -48,10 +48,24 @@ const Auth = (() => {
   }
 
   // ── Регистрация ─────────────────────────────────────────────────────
-  async function register(email, password) {
+  // Версия редакции согласий (offer.html / privacy.html / consent.html)
+  const CONSENT_VERSION = '2026-06-27';
+  async function register(email, password, opts = {}) {
+    const nowIso = new Date().toISOString();
     const { data, error } = await db.auth.signUp({
       email, password,
-      options: { emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]*$/, '') },
+      options: {
+        emailRedirectTo: window.location.origin + window.location.pathname.replace(/[^/]*$/, ''),
+        // Фиксируем факт, версию и время согласия — доказательство получения согласия
+        data: {
+          consent_accepted: true,
+          consent_version: CONSENT_VERSION,
+          consent_at: nowIso,
+          marketing_consent: !!opts.marketing,
+          marketing_consent_version: opts.marketing ? CONSENT_VERSION : null,
+          marketing_consent_at: opts.marketing ? nowIso : null,
+        },
+      },
     });
     if (error) throw error;
     return { needsConfirmation: !data.session };

@@ -28,67 +28,127 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
-(function () {
-  'use strict';
+// ─────────────────────────────────────────────────────────────────────
+// Управляемый ES-модуль. Никакого самозапуска: контроллер формата
+// (js/format.js) ленивым импортом дёргает start()/pause()/resume()/dispose().
+// Сцена (renderer/scene/планеты/пыль/listeners) аллоцируется ТОЛЬКО в start();
+// чистые константы/хелперы и чтение DOM-данных карточек — в module-scope.
+// ─────────────────────────────────────────────────────────────────────
+
+// Порядок раскрытия карточек = порядок прихода импульсов к планетам.
+const KEYS = ['hh', 'avito', 'tasks', 'publisher', 'leads', 'monitor', 'analytics'];
+// Брендовые цвета планет (свечение/атмосфера) — тёплые + холодные.
+const NODE_COLORS = {
+  hh: 0xff5a67, avito: 0x4fd0ff, tasks: 0x68e6a0, publisher: 0xff7a86,
+  leads: 0xff9e57, monitor: 0x5ad1ff, analytics: 0xffd166,
+};
+const IMG_V = '?v=20260624c';                        // кэш-бастер иконок (обновляй при замене файла)
+const ICON = {
+  platform: 'img/platform_icon.png' + IMG_V, hh: 'img/hh_icon.png' + IMG_V, avito: 'img/avito_icon.png' + IMG_V,
+  tasks: 'img/tasks_icon.png' + IMG_V, publisher: 'img/publisher_icon.png' + IMG_V, leads: 'img/leads_icon.png' + IMG_V,
+  monitor: 'img/monitor_icon.png' + IMG_V, analytics: 'img/analytics_icon.png' + IMG_V,
+};
+const ACCENT = 0xe63946;
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const clampv = (v, a, b) => (v < a ? a : v > b ? b : v);
+
+let reduce = false;
+try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+// ── Раскрытие DOM-карточек (контракт со старым intro) ─────────────────
+// Module-scope: сами читают актуальный DOM — нужны и на fallback-пути, и в кадре.
+function revealCore() {
+  const stage = document.getElementById('eco-stage');
+  const coreEl = stage ? stage.querySelector('.eco-core') : null;
+  if (coreEl) coreEl.classList.add('shown');
+}
+function revealKey(key) {
+  const stage = document.getElementById('eco-stage');
+  if (!stage) return;
+  const el = stage.querySelector('.eco-node[data-key="' + key + '"]');
+  if (el) el.classList.add('shown');
+}
+function revealAllCards() {
+  revealCore();
+  const stage = document.getElementById('eco-stage');
+  const els = stage ? stage.querySelectorAll('.eco-node') : [];
+  for (let i = 0; i < els.length; i++) els[i].classList.add('shown');
+}
+
+// Полный статичный финал без 3D (reduced-motion / нет WebGL / нет канваса).
+function settleStatic() {
+  revealAllCards();
+  const veil = document.getElementById('intro-veil');
+  const canvas = document.getElementById('intro-canvas');
+  if (veil) veil.classList.add('lift');
+  if (canvas) canvas.classList.add('done');           // скрыть канвас
+  document.body.classList.remove('intro-lock');
+  document.body.classList.add('intro-done');
+}
+
+// ── Данные карточки из (скрытых) DOM-плиток — единый источник + SEO ────
+const CARD_CACHE = {};
+function cardData(key) {
+  if (CARD_CACHE[key]) return CARD_CACHE[key];
+  const stage = document.getElementById('eco-stage');
+  const el = key === 'platform'
+    ? (stage && stage.querySelector('.eco-core'))
+    : (stage && stage.querySelector('.eco-node[data-key="' + key + '"]'));
+  let d;
+  if (!el) {
+    d = { name: key, sub: '', desc: '', live: true, badge: '', cta: '', icon: ICON[key] };
+  } else {
+    const nmEl = el.querySelector('.nm');
+    const small = nmEl ? nmEl.querySelector('small') : null;
+    const name = nmEl ? ((nmEl.childNodes[0] && nmEl.childNodes[0].textContent) || nmEl.textContent).trim() : key;
+    const badgeEl = el.querySelector('.eco-badge');
+    const descEl = el.querySelector('.desc');
+    const ctaEl = el.querySelector('.eco-cta');
+    const img = el.querySelector('.ico img, .disc img');
+    d = {
+      name,
+      sub: small ? small.textContent.trim() : '',
+      desc: (descEl ? descEl.textContent : (small ? small.textContent : '')).trim(),
+      detail: (el.getAttribute('data-detail') || '').trim(),     // длинное описание (карточка детали)
+      slogan: (el.getAttribute('data-slogan') || '').trim(),     // слоган
+      live: badgeEl ? badgeEl.classList.contains('live') : true,
+      badge: badgeEl ? badgeEl.textContent.trim() : (key === 'platform' ? 'Ядро' : ''),
+      cta: ctaEl ? ctaEl.textContent.trim() : (key === 'platform' ? 'Скачать' : ''),
+      icon: img ? img.getAttribute('src') : ICON[key],
+    };
+  }
+  CARD_CACHE[key] = d; return d;
+}
+
+// ── Жизненный цикл (управляется js/format.js) ─────────────────────────
+let started = false;     // сцена построена?
+let _api = null;         // { pause, resume, dispose } — замыкания живой сцены
+
+// Управление сценой из контроллера формата:
+export function pause()   { if (_api) _api.pause(); }
+export function resume()  { if (!started) return start(); return _api ? _api.resume() : false; }
+export function dispose() { if (_api) _api.dispose(); }
+
+// start(opts) → true (сцена запущена) | false (провал → контроллер откатывается в 2D).
+// Провал = нет #intro-canvas/#eco-stage, prefers-reduced-motion или WebGL недоступен.
+export function start(opts) {
+  if (started) return resume();                              // идемпотентность: повторный start = resume
 
   const canvas = document.getElementById('intro-canvas');
   const veil   = document.getElementById('intro-veil');
   const skip   = document.getElementById('intro-skip');
   const stage  = document.getElementById('eco-stage');
-  const coreEl = stage ? stage.querySelector('.eco-core') : null;
 
-  // Порядок раскрытия карточек = порядок прихода импульсов к планетам.
-  const KEYS = ['hh', 'avito', 'tasks', 'publisher', 'leads', 'monitor', 'analytics'];
-  // Брендовые цвета планет (свечение/атмосфера) — тёплые + холодные.
-  const NODE_COLORS = {
-    hh: 0xff5a67, avito: 0x4fd0ff, tasks: 0x68e6a0, publisher: 0xff7a86,
-    leads: 0xff9e57, monitor: 0x5ad1ff, analytics: 0xffd166,
-  };
-  const IMG_V = '?v=20260624c';                        // кэш-бастер иконок (обновляй при замене файла)
-  const ICON = {
-    platform: 'img/platform_icon.png' + IMG_V, hh: 'img/hh_icon.png' + IMG_V, avito: 'img/avito_icon.png' + IMG_V,
-    tasks: 'img/tasks_icon.png' + IMG_V, publisher: 'img/publisher_icon.png' + IMG_V, leads: 'img/leads_icon.png' + IMG_V,
-    monitor: 'img/monitor_icon.png' + IMG_V, analytics: 'img/analytics_icon.png' + IMG_V,
-  };
-  const ACCENT = 0xe63946;
-
-  const lerp = (a, b, t) => a + (b - a) * t;
-  const clampv = (v, a, b) => (v < a ? a : v > b ? b : v);
-
-  let reduce = false;
-  try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
-
-  // ── Раскрытие DOM-карточек (контракт со старым intro) ─────────────────
-  function revealCore() { if (coreEl) coreEl.classList.add('shown'); }
-  function revealKey(key) {
-    if (!stage) return;
-    const el = stage.querySelector('.eco-node[data-key="' + key + '"]');
-    if (el) el.classList.add('shown');
-  }
-  function revealAllCards() {
-    revealCore();
-    const els = stage ? stage.querySelectorAll('.eco-node') : [];
-    for (let i = 0; i < els.length; i++) els[i].classList.add('shown');
-  }
-
-  // Полный статичный финал без 3D (reduced-motion / нет WebGL).
-  function settleStatic() {
-    revealAllCards();
-    if (veil) veil.classList.add('lift');
-    if (canvas) canvas.classList.add('done');           // скрыть канвас
-    document.body.classList.remove('intro-lock');
-    document.body.classList.add('intro-done');
-  }
-
-  if (!canvas || !stage) { settleStatic(); return; }
+  if (!canvas || !stage) { settleStatic(); return false; }   // нет канваса/сцены → 2D
   document.body.classList.add('intro-lock');
-  if (reduce) { settleStatic(); return; }
+  if (reduce) { settleStatic(); return false; }              // уважаем reduced-motion → 2D
 
   // ── Рендерер / сцена / камера ─────────────────────────────────────────
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  } catch (e) { settleStatic(); return; }
+  } catch (e) { settleStatic(); return false; }              // WebGL недоступен → 2D
   renderer.setClearColor(0x020105, 1);                 // тёмный космос (почти чёрный)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -658,7 +718,11 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
   // ── Состояние / тайминги ──────────────────────────────────────────────
   let phase = 'intro';            // 'intro' → 'idle'
-  let raf = 0, start = 0, last = 0, endAt = 0, paused = false;
+  let raf = 0, startT = 0, last = 0, endAt = 0, paused = false;
+  let running = false;                 // мастер стоп-флаг кадра (pause/dispose снимают)
+  let _attached = false;               // интерактив-listeners подцеплены?
+  let _safety = 0;                     // id таймера-страховки интро
+  const _listeners = [];               // [target, type, fn, opts] — снять в pause/dispose
   let focus = 0, focusTarget = null, focusEntry = null, focusRef = null;
   // focusEntry — гейт ВЗАИМОДЕЙСТВИЯ (сбрасывается рано, чтобы вернуть управление);
   // focusRef — ВИЗУАЛЬНАЯ ссылка, держится до полного возврата камеры (fp≈0), без рывка в конце.
@@ -708,39 +772,6 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
     badge: document.getElementById('pc-badge'), cta: document.getElementById('pc-cta'),
   } : null;
   let hovered = null;
-  const CARD_CACHE = {};
-
-  // Данные карточки берём из (скрытых) DOM-плиток — единый источник + SEO.
-  function cardData(key) {
-    if (CARD_CACHE[key]) return CARD_CACHE[key];
-    const el = key === 'platform'
-      ? (stage && stage.querySelector('.eco-core'))
-      : (stage && stage.querySelector('.eco-node[data-key="' + key + '"]'));
-    let d;
-    if (!el) {
-      d = { name: key, sub: '', desc: '', live: true, badge: '', cta: '', icon: ICON[key] };
-    } else {
-      const nmEl = el.querySelector('.nm');
-      const small = nmEl ? nmEl.querySelector('small') : null;
-      const name = nmEl ? ((nmEl.childNodes[0] && nmEl.childNodes[0].textContent) || nmEl.textContent).trim() : key;
-      const badgeEl = el.querySelector('.eco-badge');
-      const descEl = el.querySelector('.desc');
-      const ctaEl = el.querySelector('.eco-cta');
-      const img = el.querySelector('.ico img, .disc img');
-      d = {
-        name,
-        sub: small ? small.textContent.trim() : '',
-        desc: (descEl ? descEl.textContent : (small ? small.textContent : '')).trim(),
-        detail: (el.getAttribute('data-detail') || '').trim(),     // длинное описание (карточка детали)
-        slogan: (el.getAttribute('data-slogan') || '').trim(),     // слоган
-        live: badgeEl ? badgeEl.classList.contains('live') : true,
-        badge: badgeEl ? badgeEl.textContent.trim() : (key === 'platform' ? 'Ядро' : ''),
-        cta: ctaEl ? ctaEl.textContent.trim() : (key === 'platform' ? 'Скачать' : ''),
-        icon: img ? img.getAttribute('src') : ICON[key],
-      };
-    }
-    CARD_CACHE[key] = d; return d;
-  }
 
   function fillCard(key) {
     if (!pc) return;
@@ -847,8 +878,8 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
   }
 
   function frame(now) {
-    if (!start) { start = now; last = now; }
-    const t = now - start;
+    if (!startT) { startT = now; last = now; }
+    const t = now - startT;
     const dt = Math.min(50, now - last) / 1000; last = now;
     const tsec = t / 1000;
 
@@ -1003,42 +1034,124 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
       if (t >= END && !endAt) endAt = now;
       if (endAt && now - endAt > 250) { enterIdle(); }
     }
-    raf = requestAnimationFrame(frame);
+    if (running) raf = requestAnimationFrame(frame);    // стоп-флаг: pause/dispose не пере-армят кадр
   }
 
   // ── Пауза при скрытой вкладке ─────────────────────────────────────────
   function onVisibility() {
     if (document.hidden) { paused = true; cancelAnimationFrame(raf); }
-    else if (paused) { paused = false; last = 0; raf = requestAnimationFrame(frame); }
+    else if (paused) { paused = false; last = 0; if (running) raf = requestAnimationFrame(frame); }
   }
 
-  window.addEventListener('resize', onResize);
-  window.addEventListener('mousemove', onMouse);
-  window.addEventListener('mousedown', onDown);
-  window.addEventListener('mouseup', onUp);
-  window.addEventListener('wheel', onWheel, { passive: false });
-  window.addEventListener('touchstart', onTouchStart, { passive: true });
-  window.addEventListener('touchmove', onTouchMove, { passive: false });   // нужен preventDefault при вращении
-  window.addEventListener('touchend', onTouchEnd, { passive: true });
-  window.addEventListener('touchcancel', onTouchEnd, { passive: true });
-  window.addEventListener('click', onClick);
-  document.addEventListener('visibilitychange', onVisibility);
-  if (skip) skip.addEventListener('click', skipIntro);
-  const bar = document.querySelector('.topbar');
-  if (bar) bar.addEventListener('click', skipIntro, true);
-  document.addEventListener('keydown', onKey);
-  // Кнопки рамки детали
-  const pdClose = document.getElementById('pd-close');
-  if (pdClose) pdClose.addEventListener('click', () => setFocus(null));
-  const pdCta = document.getElementById('pd-cta');
-  if (pdCta) pdCta.addEventListener('click', () => {
+  // ── Именованные обработчики кнопок рамки детали (снимаемы в dispose) ───
+  function onPdClose() { setFocus(null); }
+  function onPdCta() {
     const k = focusTarget && focusTarget.key;
     const live = k ? cardData(k).live : true;
     if (live) document.getElementById('hero-platform-dl')?.click();          // скачать лаунчер
     else window.open('https://t.me/VacantrixB_O_T', '_blank', 'noopener');   // «Узнать первым»
-  });
+  }
 
+  // ── Подцепка/снятие ВСЕХ слушателей (pause/resume/dispose) ─────────────
+  function on(target, type, fn, opts) {
+    target.addEventListener(type, fn, opts);
+    _listeners.push([target, type, fn, opts]);
+  }
+  function attach() {
+    if (_attached) return;
+    _attached = true;
+    on(window, 'resize', onResize);
+    on(window, 'mousemove', onMouse);
+    on(window, 'mousedown', onDown);
+    on(window, 'mouseup', onUp);
+    on(window, 'wheel', onWheel, { passive: false });
+    on(window, 'touchstart', onTouchStart, { passive: true });
+    on(window, 'touchmove', onTouchMove, { passive: false });   // нужен preventDefault при вращении
+    on(window, 'touchend', onTouchEnd, { passive: true });
+    on(window, 'touchcancel', onTouchEnd, { passive: true });
+    on(window, 'click', onClick);
+    on(document, 'visibilitychange', onVisibility);
+    if (skip) on(skip, 'click', skipIntro);
+    const bar = document.querySelector('.topbar');
+    if (bar) on(bar, 'click', skipIntro, true);
+    on(document, 'keydown', onKey);
+    const pdClose = document.getElementById('pd-close');
+    if (pdClose) on(pdClose, 'click', onPdClose);
+    const pdCta = document.getElementById('pd-cta');
+    if (pdCta) on(pdCta, 'click', onPdCta);
+  }
+  function detach() {
+    if (!_attached) return;
+    _attached = false;
+    for (let i = 0; i < _listeners.length; i++) {
+      const L = _listeners[i];
+      L[0].removeEventListener(L[1], L[2], L[3]);
+    }
+    _listeners.length = 0;
+  }
+
+  // ── Освобождение GPU: геометрии/материалы/текстуры → контекст ──────────
+  function _teardownGPU() {
+    const texSet = new Set();
+    const addTex = (m) => {
+      if (!m) return;
+      for (const k in m) { const v = m[k]; if (v && v.isTexture) texSet.add(v); }
+      if (m.uniforms) for (const u in m.uniforms) { const mu = m.uniforms[u]; const v = mu && mu.value; if (v && v.isTexture) texSet.add(v); }
+    };
+    try {
+      scene.traverse((o) => {
+        if (o.geometry && o.geometry.dispose) o.geometry.dispose();
+        const mat = o.material;
+        if (Array.isArray(mat)) mat.forEach((m) => { addTex(m); if (m && m.dispose) m.dispose(); });
+        else if (mat) { addTex(mat); if (mat.dispose) mat.dispose(); }
+      });
+    } catch (e) {}
+    if (scene.environment) texSet.add(scene.environment);     // PMREM-окружение
+    [glowTex, nebulaTex, circuitTex].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
+    texSet.forEach((t) => { try { if (t.dispose) t.dispose(); } catch (e) {} });
+    try { if (composer.dispose) composer.dispose(); } catch (e) {}
+    try { pmrem.dispose(); } catch (e) {}
+    try { renderer.dispose(); renderer.forceContextLoss(); } catch (e) {}
+  }
+
+  // ── pause / resume / dispose (замыкания живой сцены) ───────────────────
+  function doPause() {
+    cancelAnimationFrame(raf); raf = 0;
+    running = false;                                   // стоп-флаг: frame() не пере-армится
+    if (_safety) { clearTimeout(_safety); _safety = 0; }
+    detach();                                          // снять интерактив-listeners
+    document.body.classList.remove('planets-on');      // вернуть 2D-плитки .eco-stage
+    if (canvas) canvas.classList.add('done');          // спрятать фон-канвас
+  }
+  function doResume() {
+    if (running) return true;                          // уже живём
+    document.body.classList.add('planets-on');
+    if (canvas) canvas.classList.remove('done');
+    attach();
+    onResize();                                        // вьюпорт мог измениться на паузе
+    running = true; paused = false; last = 0;          // last=0 — сброс dt (как в onVisibility)
+    raf = requestAnimationFrame(frame);
+    return true;
+  }
+  function doDispose() {
+    cancelAnimationFrame(raf); raf = 0;
+    running = false;
+    if (_safety) { clearTimeout(_safety); _safety = 0; }
+    detach();
+    _teardownGPU();
+    document.body.classList.remove('planets-on');
+    if (canvas) canvas.classList.add('done');
+    started = false; _api = null;                      // область start() становится сборимой (GC)
+  }
+
+  // ── Запуск сцены ──────────────────────────────────────────────────────
+  running = true;
+  attach();
   raf = requestAnimationFrame(frame);
   // Страховка: если интро зависло — гарантированно раскрыть контент.
-  setTimeout(() => { if (phase === 'intro') enterIdle(); }, END + 2500);
-})();
+  _safety = setTimeout(() => { if (phase === 'intro') enterIdle(); }, END + 2500);
+
+  _api = { pause: doPause, resume: doResume, dispose: doDispose };
+  started = true;
+  return true;
+}
