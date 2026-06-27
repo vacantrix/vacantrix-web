@@ -154,14 +154,25 @@ const Pricing = (() => {
       </div>`;
   }
 
-  // ── Биржа задач: оплата напрямую исполнителю, без подписки платформы.
-  //     НЕ заявляем удержание денег. ──
+  // ── Биржа задач: условно бесплатно (Free 1 заказ + 3 отклика/мес, Pro 299 ₽/мес).
+  //     Числа — из реальной модели Tasks, не выдуманы. Блок в стиле Publisher, без CTA. ──
   function _tasksBlock() {
     return `
-      <div class="pricing-info reveal">
-        <h3>Биржа задач — без подписки платформы</h3>
-        <p>Размещать задачи и откликаться можно бесплатно. Оплата за работу проходит
-        напрямую исполнителю — отдельная подписка на саму биржу не нужна.</p>
+      <div class="pricing-info pricing-tasks reveal">
+        <h3>Биржа задач</h3>
+        <p>Заказчики и исполнители — в одном окне. Начать можно бесплатно.</p>
+        <div class="pub-plans">
+          <div class="pub-plan">
+            <span class="pub-plan-name">Free</span>
+            <span class="pub-plan-price">Бесплатно</span>
+            <span class="pub-plan-note">1 заказ и 3 отклика в месяц</span>
+          </div>
+          <div class="pub-plan pub-plan-pro">
+            <span class="pub-plan-name">Pro</span>
+            <span class="pub-plan-price">299 ₽<small> / мес</small></span>
+            <span class="pub-plan-note">расширенные лимиты на заказы и отклики</span>
+          </div>
+        </div>
       </div>`;
   }
 

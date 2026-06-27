@@ -286,7 +286,11 @@ a { color: inherit; text-decoration: none; }
   border: 1px solid var(--border2);
   border-radius: 20px; padding: 32px;
   display: flex; flex-direction: column; gap: 24px;
+  /* Карточка кликабельна (→ раздел приложения, см. apps.js) → аффорданс «ссылки». */
+  cursor: pointer; transition: border-color .25s ease, box-shadow .25s ease;
 }
+.app-full:hover { border-color: var(--accent);
+  box-shadow: 0 18px 44px -16px rgba(0,0,0,.6), 0 0 0 1px rgba(230,57,70,.2); }
 
 .app-full-hero {
   display: flex; flex-wrap: wrap;
@@ -376,7 +380,9 @@ a { color: inherit; text-decoration: none; }
   align-items: center; text-align: center; gap: 12px;
   transition: all .2s;
 }
-.app-card:hover { border-color: var(--border); transform: translateY(-3px); box-shadow: var(--shadow); }
+/* Карточка кликабельна (→ раздел приложения, см. apps.js) → явный hover-аффорданс «ссылки». */
+.app-card:hover { border-color: var(--accent); transform: translateY(-4px);
+  box-shadow: 0 16px 40px -14px rgba(0,0,0,.6), 0 0 0 1px rgba(230,57,70,.22); }
 .app-card-icon { width: 64px; height: 64px; border-radius: 16px; object-fit: cover; }
 .app-card-icon-ph {
   width: 64px; height: 64px; border-radius: 16px;
@@ -764,32 +770,15 @@ footer {
 }
 
 /* ===================================================================
-   Полная карточка приложения (#app-detail) — фуллскрин-оверлей
-   Тёмная тема, акцент --accent. Глубокую полировку оставляем дизайнеру.
+   Раздел приложения (#tab-app, хэш-роутер #app/<key>) — СТРАНИЦА товара.
+   Бывшая модалка-оверлей (#app-detail) удалена; контент тот же (.ad-*),
+   но это обычный раздел сайта на сплошном фоне. Акцент --accent.
    =================================================================== */
-body.app-detail-open { overflow: hidden; }
-
-.app-detail {
-  position: fixed; inset: 0; z-index: 1340;
-  display: flex; align-items: flex-start; justify-content: center;
-  padding: 40px 20px; overflow-y: auto;
-  background: rgba(8, 5, 8, .74); backdrop-filter: blur(10px);
-  animation: adFade .2s ease;
-  scrollbar-width: thin; scrollbar-color: var(--accent-d) transparent;
-}
-.app-detail::-webkit-scrollbar { width: 10px; }
-.app-detail::-webkit-scrollbar-thumb {
-  background: var(--accent-d); border-radius: 6px;
-  border: 3px solid transparent; background-clip: content-box;
-}
-.app-detail.hidden { display: none; }
-@keyframes adFade { from { opacity: 0; } to { opacity: 1; } }
-
+/* Карта-контейнер раздела прозрачна и центрируется — структуру дают
+   герой/секции/рельс внутри. Сплошной фон обеспечивает сама вкладка #tab-app
+   (в 2D = body --bg; в 3D перекрыт full-bleed --bg, см. body.planets-on .tab-panel). */
 .app-detail-panel {
-  position: relative; width: 100%; max-width: 1000px; margin: auto;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 22px; padding: 28px;
-  box-shadow: var(--shadow), 0 0 0 1px rgba(230, 57, 70, .18);
+  position: relative; width: 100%; max-width: 1000px; margin: 0 auto;
   animation: adRise .26s cubic-bezier(.2, .7, .3, 1);
 }
 @keyframes adRise {
@@ -797,14 +786,18 @@ body.app-detail-open { overflow: hidden; }
   to   { opacity: 1; transform: none; }
 }
 
-.ad-close {
-  position: absolute; top: 14px; right: 14px; z-index: 2;
-  width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center;
+/* «← Назад к инструментам» — кнопка-ссылка возврата вверху слева РАЗДЕЛА (#tab-app).
+   Заметная, но не кричащая: чип на токенах; на hover мягко сдвигается влево («назад»). */
+.ad-back {
+  display: inline-flex; align-items: center; gap: 8px; margin-bottom: 22px;
+  padding: 9px 15px; border-radius: 10px; cursor: pointer; font-family: inherit;
+  font-size: 13.5px; font-weight: 600; color: var(--text2);
   background: rgba(255, 255, 255, .05); border: 1px solid var(--border);
-  color: var(--text2); cursor: pointer; font-size: 15px; font-family: inherit;
-  transition: color .18s, border-color .18s, background .18s;
+  transition: color .18s, border-color .18s, background .18s, transform .18s;
 }
-.ad-close:hover { color: #fff; border-color: var(--accent); background: rgba(230, 57, 70, .14); }
+.ad-back:hover { color: #fff; border-color: var(--accent); background: rgba(230, 57, 70, .14);
+  transform: translateX(-2px); }
+.ad-back:focus-visible { outline: 2px solid var(--accent-b); outline-offset: 2px; }
 
 .app-detail-grid {
   display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start;
@@ -814,7 +807,7 @@ body.app-detail-open { overflow: hidden; }
 .ad-main { min-width: 0; }
 .ad-hero {
   display: flex; align-items: center; gap: 18px;
-  padding: 2px 44px 22px 0; margin-bottom: 22px;
+  padding: 2px 0 22px; margin-bottom: 22px;
   border-bottom: 1px solid var(--border2);
 }
 .ad-hero-ico {
@@ -876,12 +869,17 @@ body.app-detail-open { overflow: hidden; }
 .ad-shot {
   border-radius: 12px; overflow: hidden; border: 1px solid var(--border2);
   cursor: zoom-in; aspect-ratio: 16 / 10;
+  /* .ad-shot переиспользует класс .screenshot-item (для лайтбокса), у которого
+     width:clamp(220px,...) из карусели apps — в grid это распирало раздел по
+     горизонтали. Ширину тут задаёт сетка .ad-shots, поэтому сбрасываем. */
+  width: auto; min-width: 0;
 }
 .ad-shot img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s ease; }
 .ad-shot:hover img { transform: scale(1.05); }
 
 /* ── Правая колонка (рельс) ── */
-.ad-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 0; }
+/* sticky top:72px — рельс прилипает ПОД липким топбаром (56px), а не уезжает под него. */
+.ad-rail { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 72px; }
 .ad-rail-card {
   background: var(--glass); backdrop-filter: var(--blur);
   border: 1px solid var(--border2); border-radius: 18px; padding: 20px;
@@ -960,37 +958,31 @@ body.app-detail-open { overflow: hidden; }
   .ad-rail-card { flex: 1; min-width: 240px; }
 }
 @media (max-width: 760px) {
-  .app-detail { padding: 26px 14px; }
-  .app-detail-panel { padding: 24px 22px; }
   .ad-shots { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
 @media (max-width: 600px) {
-  .app-detail { padding: 0; }
-  .app-detail-panel { border-radius: 0; min-height: 100vh; padding: 22px 16px 40px; }
   .ad-rail { flex-direction: column; gap: 12px; }
   .ad-rail-card { min-width: 0; }
-  .ad-hero { padding-right: 40px; }
   .ad-hero-ico { width: 56px; height: 56px; border-radius: 15px; }
 }
 @media (max-width: 420px) {
-  .app-detail-panel { padding: 20px 14px 36px; }
-  .ad-hero { gap: 14px; padding-right: 38px; }
+  .ad-hero { gap: 14px; }
   .ad-hero-ico { width: 50px; height: 50px; border-radius: 13px; font-size: 24px; }
   .ad-name { font-size: 21px; }
   .ad-rail-card { padding: 18px; }
   .ad-shots { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 }
 
-/* Доступность: уважаем prefers-reduced-motion (вход оверлея, hover, reveal) */
+/* Доступность: уважаем prefers-reduced-motion (вход раздела, hover, reveal) */
 @media (prefers-reduced-motion: reduce) {
-  .app-detail, .app-detail-panel, .ad-cta, .ad-shot img,
+  .app-detail-panel, .ad-cta, .ad-shot img,
   .pricing-card, .reveal { animation: none !important; transition: none !important; }
   .ad-cta:hover, .pricing-card:hover { transform: none !important; }
   .reveal { opacity: 1 !important; transform: none !important; }
 }
 
-/* Модалки и лайтбокс должны лежать ВЫШЕ карточки приложения (#app-detail = 1340)
-   и выше липкого топбара (1200) — иначе логин/гид установки/скрин уезжают за неё. */
+/* Модалки и лайтбокс — выше липкого топбара (1200) и панели планеты (1250),
+   иначе логин/гид установки/лайтбокс уезжают под них. */
 .modal-overlay { z-index: 1400; }
 #lightbox { z-index: 1400; }
 
@@ -1003,43 +995,101 @@ body.app-detail-open { overflow: hidden; }
    красного (230,57,70). Движение — transform/opacity (без layout-thrash).
    =================================================================== */
 
-/* ── ЗАДАЧА 1. Конвейер данных по нижней кромке топбара (.header-fx) ──
-   Абсолютный слой на дне .topbar (sticky = containing block). Виден в 2D и 3D,
-   не перекрывает текст/CTA/переключатель (живёт в нижних ~6px, контент выше). */
-.header-fx {
-  position: absolute; left: 0; right: 0; bottom: -1px; height: 6px;
-  z-index: 0; pointer-events: none; overflow: hidden;
+/* ── C1. Геро-анимация автоматизации (#tab-home .home-content > .hero-fx) ──
+   Декоративный слой ЗА текстом/CTA геро-зоны: мягкое свечение-пульс, орбиты
+   узлов-ботов и тонкие трассы данных с бегущими пакетами. Низкий контраст,
+   pointer-events:none, z-index:-1 (над фоном .home-content, под контентом —
+   родитель isolation:isolate). Только transform/opacity. */
+.hero-fx {
+  position: absolute; left: 0; right: 0; top: 0; height: 460px;
+  z-index: -1; pointer-events: none; overflow: hidden;
+  -webkit-mask: linear-gradient(to bottom, #000 55%, transparent);
+          mask: linear-gradient(to bottom, #000 55%, transparent);
 }
-/* рейл-«провод»: тонкая прерывистая линия (статичная текстура схемы) */
-.header-fx .hfx-rail {
-  position: absolute; left: 0; right: 0; bottom: 1px; height: 1px;
-  background:
-    repeating-linear-gradient(90deg,
-      rgba(230,57,70,.22) 0 3px,
-      transparent 3px 7px,
-      rgba(230,57,70,.10) 7px 9px,
-      transparent 9px 16px);
+/* мягкий пульс-свечение по центру за заголовком */
+.hf-glow {
+  position: absolute; left: 50%; top: 150px; width: 560px; height: 320px;
+  transform: translate(-50%,-50%); border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(230,57,70,.16), transparent 68%);
+  animation: hfGlow 6.5s ease-in-out infinite;
 }
-/* пакеты-сигналы: бегущие красные «искры» по проводу */
-.header-fx .hfx-pkt {
-  position: absolute; bottom: 0; left: 0; width: 56px; height: 2px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, transparent, var(--accent-b) 55%, #fff);
-  box-shadow: 0 0 6px 1px rgba(230,57,70,.75);
-  opacity: 0; transform: translateX(-60px);
-  animation: hfxRun 5.2s linear infinite;
+@keyframes hfGlow {
+  0%,100% { opacity: .5;  transform: translate(-50%,-50%) scale(1); }
+  50%     { opacity: .85; transform: translate(-50%,-50%) scale(1.12); }
 }
-.header-fx .hfx-pkt:nth-child(2) { animation-delay: 0s;    animation-duration: 5.2s; }
-.header-fx .hfx-pkt:nth-child(3) { animation-delay: 1.9s;  animation-duration: 6.4s; }
-.header-fx .hfx-pkt:nth-child(4) { animation-delay: 3.6s;  animation-duration: 4.6s; }
-@keyframes hfxRun {
-  0%   { transform: translateX(-60px); opacity: 0; }
-  8%   { opacity: 1; }
-  90%  { opacity: 1; }
-  100% { transform: translateX(100vw); opacity: 0; }
+/* орбиты узлов-ботов вокруг геро-центра */
+.hf-orbit {
+  position: absolute; left: 50%; top: 150px; border-radius: 50%;
+  border: 1px solid rgba(230,57,70,.10); transform: translate(-50%,-50%);
 }
-/* в 3D чуть приглушаем, чтобы не спорить с живым канвасом */
-body.mode-3d .header-fx { opacity: .7; }
+.hf-orbit-1 { width: 360px; height: 360px; animation: hfSpin 26s linear infinite; }
+.hf-orbit-2 { width: 560px; height: 560px; animation: hfSpin 40s linear infinite reverse; }
+.hf-orbit i {
+  position: absolute; top: -3px; left: 50%; width: 6px; height: 6px; margin-left: -3px;
+  border-radius: 50%; background: var(--accent-b); box-shadow: 0 0 8px 1px rgba(230,57,70,.7);
+}
+.hf-orbit-2 i { width: 5px; height: 5px; top: -2.5px; opacity: .85; }
+@keyframes hfSpin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+/* трассы данных по краям геро с бегущими сверху вниз пакетами */
+.hf-trace {
+  position: absolute; top: 36px; bottom: 60px; width: 1px;
+  background: repeating-linear-gradient(to bottom,
+    rgba(230,57,70,.16) 0 4px, transparent 4px 12px);
+  overflow: hidden;
+}
+.hf-trace-l { left: 14%; }
+.hf-trace-r { right: 14%; }
+.hf-trace::before {
+  content: ''; position: absolute; left: -1px; width: 3px; height: 38px; top: -38px;
+  background: linear-gradient(to bottom, transparent, var(--accent-b), transparent);
+  box-shadow: 0 0 8px 1px rgba(230,57,70,.6);
+  animation: hfPkt 5.5s linear infinite;
+}
+.hf-trace-r::before { animation-delay: 2.6s; animation-duration: 6.8s; }
+@keyframes hfPkt { 0% { top: -38px; } 100% { top: 100%; } }
+/* в 3D планеты уже двигаются — геро-анимацию приглушаем */
+body.mode-3d .hero-fx { opacity: .22; }
+@media (max-width: 600px) { .hf-trace { display: none; } }
+
+/* ── C2. Боковые скролл-трассы (.side-fx) — движутся по --scroll-progress ──
+   Узкие fixed-«провода» в пустых полях слева/справа от центральной колонки
+   (~900px). Пакеты едут вниз (слева) / вверх (справа), fill растёт по прогрессу.
+   Единый мотив с геро (C1) и нижней линией (#scroll-anim). Скрыты, когда
+   боковые поля схлопываются (≤1080px). */
+.side-fx {
+  position: fixed; top: 64px; bottom: 44px; width: 44px; z-index: 1;
+  pointer-events: none; overflow: hidden;
+}
+.side-fx-l { left: calc(25vw - 247px); }   /* центр левого поля = (50vw-450)/2 */
+.side-fx-r { right: calc(25vw - 247px); }
+.sf-rail {
+  position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px;
+  background: repeating-linear-gradient(to bottom,
+    rgba(230,57,70,.15) 0 4px, transparent 4px 14px);
+}
+.sf-fill {
+  position: absolute; left: 50%; width: 2px; margin-left: -1px; top: 0;
+  height: calc(var(--scroll-progress, 0) * 100%);
+  background: linear-gradient(to bottom, transparent, rgba(230,57,70,.5));
+  box-shadow: 0 0 8px 1px rgba(230,57,70,.35);
+}
+.side-fx-r .sf-fill { top: auto; bottom: 0;
+  background: linear-gradient(to top, transparent, rgba(230,57,70,.5)); }
+.sf-pkt {
+  position: absolute; left: 50%; width: 7px; height: 7px; margin-left: -3.5px;
+  border-radius: 50%; background: var(--accent-b);
+  box-shadow: 0 0 9px 1px rgba(230,57,70,.7);
+  transition: top .12s linear;
+}
+.side-fx-l .sf-pkt:nth-child(3) { top: calc(var(--scroll-progress,0) * 130% - 14%); }
+.side-fx-l .sf-pkt:nth-child(4) { top: calc(var(--scroll-progress,0) * 96%  + 16%); }
+.side-fx-l .sf-pkt:nth-child(5) { top: calc(var(--scroll-progress,0) * 150% - 32%); }
+.side-fx-r .sf-pkt:nth-child(3) { top: calc((1 - var(--scroll-progress,0)) * 130% - 14%); }
+.side-fx-r .sf-pkt:nth-child(4) { top: calc((1 - var(--scroll-progress,0)) * 96%  + 16%); }
+.side-fx-r .sf-pkt:nth-child(5) { top: calc((1 - var(--scroll-progress,0)) * 150% - 32%); }
+/* в 3D планеты уже двигаются — боковые трассы приглушаем */
+body.mode-3d .side-fx { opacity: .45; }
+@media (max-width: 1080px) { .side-fx { display: none; } }
 
 /* ── ЗАДАЧА 2. Нижний прогресс-бегунок (#scroll-anim) по --scroll-progress ──
    fill = пройденный путь, runner(шестерёнка) = текущая точка, rail = остаток. */
@@ -1074,10 +1124,10 @@ body.mode-3d .header-fx { opacity: .7; }
 }
 
 /* prefers-reduced-motion: всё движение по теме автоматизации — стоп.
-   Топбар: убрать бегущие пакеты (оставить статичный провод).
-   Низ: спрятать fill/бегунок, оставить тонкий статичный рейл. */
+   Геро- и боковые слои убираем целиком; нижнюю линию — без fill/бегунка
+   (остаётся тонкий статичный рейл). */
 @media (prefers-reduced-motion: reduce) {
-  .header-fx .hfx-pkt { display: none; }
+  .hero-fx, .side-fx { display: none; }
   .sfx-fill, .sfx-runner { display: none; }
   .sfx-runner svg { animation: none; }
 }

@@ -1,21 +1,28 @@
 // =====================================================================
-// Модуль «Полная карточка приложения» — AppDetail.open(key) / close().
+// Модуль «Раздел приложения» — AppDetail.open(key) + хэш-роутер #app/<key>.
 //
-// Строит фуллскрин-оверлей #app-detail из window.APP_DATA[key]
-// (единый источник rich-контента; читают и 2D-apps.js, и 3D-intro3d.js).
-// Лейаут зеркалит десктоп tool_detail_screen.py:
-//   СЛЕВА  — hero, «Что это», «Как работает», «Как начать» (live), видео, скрины;
-//   СПРАВА — рельс: цена (Pricing.forTool) + CTA + «Паспорт инструмента».
+// РАНЬШЕ был фуллскрин-модалкой (#app-detail overlay). ТЕПЕРЬ — навигируемый
+// РАЗДЕЛ-страница внутри сайта (настоящий переход по ссылке):
+//   • AppDetail.open(key) НЕ строит оверлей, а НАВИГИРУЕТ: location.hash='#app/'+key.
+//     Зовут apps.js (карточки), intro3d.js (3D-планеты) и main.js (2D-плитки) —
+//     им менять ничего не нужно, вызов стал навигацией автоматически.
+//   • Хэш-роутер (hashchange + первичная загрузка) рендерит контент в #tab-app,
+//     скрывает остальные .tab-panel, активирует #tab-app, прокручивает вверх.
+//   • Контент строит тот же _build(d) из window.APP_DATA[key]; рельс цены —
+//     Pricing.forTool, скриншоты — лайтбокс Apps.openLightbox('appdetail', i).
 //
-// Закрытие: ✕, клик по подложке, Esc. Esc/overlay-листенеры вешаются ОДИН
-// раз (_ensureInit) → повторные open/close НЕ плодят обработчики.
-// Скриншоты переиспользуют существующий лайтбокс (Apps.openLightbox).
+// «← Назад к инструментам» (.ad-back): есть внутрисайтовая история → history.back();
+// прямой заход по ссылке #app/hh → фолбек на каталог (без ухода с сайта в пустоту).
+// Интеграция с вкладками: js/main.js зовёт AppDetail.clearRoute() при клике вкладки.
+// Никакого fixed-оверлея, scroll-lock и закрытия по Esc больше нет.
 // =====================================================================
 
 const AppDetail = (() => {
 
   let _initialized = false;
-  let _openKey = null;
+  let _openKey      = null;   // ключ показываемого раздела (null = не на app-роуте)
+  let _returnTab    = null;   // вкладка, с которой вошли в раздел (для возврата)
+  let _cameFromSite = false;  // переход был ВНУТРИ сайта (есть куда history.back())
 
   function _esc(str) {
     return String(str == null ? '' : str).replace(/[&<>"']/g, c =>
@@ -112,7 +119,9 @@ const AppDetail = (() => {
       </div>`;
   }
 
-  // ── Сборка панели ────────────────────────────────────────────────────
+  // ── Сборка раздела ───────────────────────────────────────────────────
+  // Контент идентичен прежней карточке-модалке; вместо ✕ вверху — «Назад».
+  // Это уже НЕ диалог (нет role=dialog/aria-modal) — обычная страница-раздел.
   function _build(d) {
     const isLive = d.status === 'live';
     const how    = Array.isArray(d.how) ? d.how : [];
@@ -126,8 +135,8 @@ const AppDetail = (() => {
       : `<span class="ad-hero-ico">${_esc(d.emoji || '•')}</span>`;
 
     return `
-      <div class="app-detail-panel" role="dialog" aria-modal="true" aria-label="${_esc(d.name)}">
-        <button class="ad-close" type="button" data-detail-close aria-label="Закрыть">✕</button>
+      <div class="app-detail-panel ad-section-page" aria-label="${_esc(d.name)}">
+        <button class="ad-back" type="button" data-detail-back>← Назад к инструментам</button>
         <div class="app-detail-grid">
 
           <div class="ad-main">
@@ -188,50 +197,121 @@ const AppDetail = (() => {
       </div>`;
   }
 
-  // ── Init: глобальные закрытия (один раз) ─────────────────────────────
+  // ── Имя активной вкладки (для запоминания точки возврата) ──────────────
+  function _activeTabName() {
+    const p = document.querySelector('.tab-panel.active');
+    if (!p || !p.id) return null;
+    const name = p.id.replace(/^tab-/, '');
+    return name === 'app' ? null : name;   // сам раздел не считается точкой возврата
+  }
+
+  // ── Парсинг хэша → ключ приложения или null ───────────────────────────
+  function _routeKey() {
+    const m = (location.hash || '').match(/^#app\/(.+)$/);
+    if (!m) return null;
+    let k; try { k = decodeURIComponent(m[1]); } catch (e) { k = m[1]; }
+    return k;
+  }
+
+  // ── Показать раздел приложения ────────────────────────────────────────
+  function _showSection(key, panel) {
+    panel.innerHTML = _build((window.APP_DATA || {})[key]);
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    panel.classList.add('active');
+    _openKey = key;
+    try { window.scrollTo(0, 0); } catch (e) {}
+    if (window._initReveal) window._initReveal();
+  }
+
+  // ── Вернуть обычную вкладку (после выхода из раздела) ──────────────────
+  // Фолбек _returnTab='apps' (каталог) для прямого захода по ссылке.
+  function _restoreTab() {
+    const tab = _returnTab || 'apps';
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('tab-' + tab)?.classList.add('active');
+    document.querySelectorAll('.tab-btn[data-tab="' + tab + '"]').forEach(b => b.classList.add('active'));
+    if (window._initReveal) window._initReveal();
+  }
+
+  // ── Роутер: на hashchange и при первичной загрузке ────────────────────
+  function _route() {
+    const panel = document.getElementById('tab-app');
+    if (!panel) return;
+    const key = _routeKey();
+    if (key && (window.APP_DATA || {})[key]) {
+      _showSection(key, panel);
+    } else {
+      // Уходим с app-роута (или его и не было). Восстанавливаем вкладку ТОЛЬКО
+      // если реально показывали раздел — чтобы не сбить дефолтную #tab-home при
+      // обычной первичной загрузке без хэша.
+      const wasApp = _openKey !== null || panel.classList.contains('active');
+      panel.classList.remove('active');
+      panel.innerHTML = '';
+      _openKey = null;
+      if (wasApp) _restoreTab();
+    }
+  }
+
+  // ── «Назад к инструментам» ────────────────────────────────────────────
+  function _back() {
+    if (_cameFromSite && window.history.length > 1) {
+      window.history.back();   // вернёт прежнее состояние → hashchange → _restoreTab
+    } else {
+      // Прямой заход по ссылке: чистим хэш без новой записи истории, показываем каталог.
+      try { history.replaceState(null, '', location.pathname + location.search); }
+      catch (e) { location.hash = ''; }
+      _openKey = null;
+      _restoreTab();
+    }
+  }
+
+  // ── Init: один раз — делегат «Назад» + слушатель hashchange + первый роут ─
   function _ensureInit() {
     if (_initialized) return;
-    const overlay = document.getElementById('app-detail');
-    if (!overlay) return;
+    const panel = document.getElementById('tab-app');
+    if (!panel) return;
     _initialized = true;
-
-    // Клик по подложке (вне панели) ИЛИ по кнопке ✕ → закрыть.
-    overlay.addEventListener('click', e => {
-      if (e.target === overlay || (e.target.closest && e.target.closest('[data-detail-close]'))) close();
+    panel.addEventListener('click', e => {
+      if (e.target.closest && e.target.closest('[data-detail-back]')) { e.preventDefault(); _back(); }
     });
-    // Esc — единственный keydown-листенер, активен только при открытой карточке.
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape' && _openKey) close();
-    });
+    window.addEventListener('hashchange', _route);
+    _route();   // первичный разбор — поддержка прямого захода по ссылке #app/<key>
   }
 
-  // ── Публичное API ────────────────────────────────────────────────────
+  // ── Публичное API ─────────────────────────────────────────────────────
+  // open(key) — теперь НАВИГАЦИЯ, а не модалка. Зовут apps.js / intro3d.js / main.js.
   function open(key) {
-    const data = (window.APP_DATA || {})[key];
-    if (!data) { console.warn('AppDetail: нет данных для ключа', key); return; }
-    const overlay = document.getElementById('app-detail');
-    if (!overlay) return;
-
+    if (!(window.APP_DATA || {})[key]) { console.warn('AppDetail: нет данных для ключа', key); return; }
     _ensureInit();
-    overlay.innerHTML = _build(data);
-    overlay.classList.remove('hidden');
-    overlay.setAttribute('aria-hidden', 'false');
-    overlay.scrollTop = 0;
-    document.body.classList.add('app-detail-open');   // блок скролла страницы
-    _openKey = key;
+    if (_openKey === null) _returnTab = _activeTabName() || 'apps';   // запоминаем точку возврата
+    _cameFromSite = true;
+    const target = '#app/' + encodeURIComponent(key);
+    if (location.hash === target) _route();   // тот же хэш → hashchange не сработает, рендерим вручную
+    else location.hash = target;
   }
 
-  function close() {
-    const overlay = document.getElementById('app-detail');
-    if (!overlay) return;
-    overlay.classList.add('hidden');
-    overlay.setAttribute('aria-hidden', 'true');
-    overlay.innerHTML = '';                            // снимаем DOM-листенеры панели
-    document.body.classList.remove('app-detail-open');
+  // Сброс app-роута без захода в раздел (зовёт main.js при клике обычной вкладки).
+  // main.js сам уже активировал нужную вкладку → здесь НЕ трогаем active-состояние,
+  // только убираем хэш и прячем #tab-app.
+  function clearRoute() {
+    if (_routeKey() === null && _openKey === null) return;   // не на app-роуте — нечего чистить
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    const panel = document.getElementById('tab-app');
+    if (panel) { panel.classList.remove('active'); panel.innerHTML = ''; }
     _openKey = null;
   }
 
-  return { open, close };
+  // Совместимость: close() = уйти из раздела к каталогу (как «Назад»).
+  function close() { _back(); }
+
+  // Первичная инициализация роутера. Скрипты в конце <body>, но при парсинге
+  // readyState ещё 'loading' → инициализируемся на DOMContentLoaded, иначе сразу.
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _ensureInit);
+  else _ensureInit();
+
+  return { open, close, clearRoute };
 })();
 
 window.AppDetail = AppDetail;

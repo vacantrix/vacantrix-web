@@ -205,7 +205,7 @@
   @keyframes cueBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(7px); } }
 
   /* сплошная секция во всю ширину (full-bleed), контент по центру ~900px */
-  .home-content { position: relative; width: 100vw; margin-left: calc(50% - 50vw);
+  .home-content { position: relative; isolation: isolate; width: 100vw; margin-left: calc(50% - 50vw);
     background: var(--bg); text-align: center;
     padding: 52px max(20px, calc(50vw - 450px)) 40px; }
   .home-content::before { content: ''; position: absolute; left: 0; right: 0; top: -70px;
@@ -236,11 +236,22 @@
   }
   body:not(.mode-3d) .eco-node.is-soon { opacity: .92 !important; }   /* «скоро» — чуть приглушены */
 
-  /* 2D: карточки-узлы приподнимаются на hover (ритм как у .app-card/.info-card) */
-  body:not(.mode-3d) .eco-node { cursor: default;
+  /* 2D: карточки-узлы приподнимаются на hover (ритм как у .app-card/.info-card).
+     Плитки кликабельны (→ раздел приложения, см. js/main.js) → cursor:pointer. */
+  body:not(.mode-3d) .eco-node,
+  body:not(.mode-3d) .eco-core { cursor: pointer; }
+  body:not(.mode-3d) .eco-node {
     transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
   body:not(.mode-3d) .eco-node:hover { transform: translateY(-5px) !important; border-color: var(--accent);
     box-shadow: 0 18px 42px -16px rgba(0,0,0,.7), 0 0 0 1px rgba(230,57,70,.22); }
+
+  /* Раздел приложения (#tab-app): карта-страница .app-detail-panel центрируется
+     сама (max-width:1000px; margin:auto) — здесь только воздух сверху/снизу. */
+  #tab-app { padding: 24px 16px 64px; }
+  /* Читаемость поверх 3D-сцены: сплошная подложка в обоих 3D-состояниях.
+     planets-on уже даёт full-bleed --bg (правило .tab-panel:not(#tab-home) ниже);
+     добавляем mode-3d для переходного/fallback-кадра, чтобы канвас не просвечивал. */
+  body.mode-3d #tab-app { background: var(--bg); }
 
   /* 2D: сетка продуктов вместо радиальной раскладки */
   body:not(.mode-3d) .eco-stage {
@@ -255,6 +266,10 @@
     box-shadow: 0 0 0 1px rgba(230,57,70,.25), 0 14px 36px -12px rgba(230,57,70,.6); }
   body:not(.mode-3d) .eco-core .nm { font-size: 16px; }
   body:not(.mode-3d) .eco-core .nm small { margin-top: 3px; }
+  /* Ядро-баннер тоже кликабельно (→ раздел Platform) → hover-аффорданс как у узлов */
+  body:not(.mode-3d) .eco-core { transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+  body:not(.mode-3d) .eco-core:hover { transform: translateY(-4px); border-color: var(--accent);
+    box-shadow: 0 18px 42px -16px rgba(0,0,0,.7), 0 0 0 1px rgba(230,57,70,.22); }
   @media (max-width: 920px) { body:not(.mode-3d) .eco-stage { grid-template-columns: repeat(3, 1fr); } }
   @media (max-width: 760px) { body:not(.mode-3d) .eco-stage { grid-template-columns: repeat(2, 1fr); max-width: 520px; } }
   @media (max-width: 420px) { body:not(.mode-3d) .eco-stage { grid-template-columns: 1fr; max-width: 340px; } }
@@ -433,14 +448,6 @@
 <!-- ════════════════ A. ВЕРХНЯЯ ПАНЕЛЬ ПРОДУКТОВ ════════════════ -->
 <!-- РЕДАКТИРУЕМО: набор продуктов-иконок и пунктов меню -->
 <header class="topbar">
-  <!-- Конвейер данных (мотив автоматизации): тонкая бегущая лента по нижней кромке.
-       Декоративно, pointer-events:none; останавливается при prefers-reduced-motion. -->
-  <div class="header-fx" aria-hidden="true">
-    <span class="hfx-rail"></span>
-    <span class="hfx-pkt"></span>
-    <span class="hfx-pkt"></span>
-    <span class="hfx-pkt"></span>
-  </div>
   <span class="tp-brand tab-btn" data-tab="home"><span>V</span><span>a</span><span>c</span><span>a</span><span>n</span><span>t</span><span>r</span><span>i</span><span>x</span></span>
 
   <nav class="tp-tabs">
@@ -507,6 +514,15 @@
 
     <!-- ТЕКСТ на сплошном фоне — планеты за ним не просвечивают -->
     <section class="home-content">
+    <!-- Геро-анимация автоматизации (декор, за текстом): пульс-глоу + орбиты
+         узлов-ботов + трассы данных. pointer-events:none, z-index:-1, см. css/main.css. -->
+    <div class="hero-fx" aria-hidden="true">
+      <span class="hf-glow"></span>
+      <span class="hf-orbit hf-orbit-1"><i></i></span>
+      <span class="hf-orbit hf-orbit-2"><i></i></span>
+      <span class="hf-trace hf-trace-l"></span>
+      <span class="hf-trace hf-trace-r"></span>
+    </div>
     <div class="eco-head">
       <span class="eyebrow">Десктоп-инструменты · Windows</span>
       <h1>Не набор программ — единая экосистема</h1>
@@ -576,9 +592,9 @@
         <div class="desc">Пока другие ищут — вы откликнулись.</div>
         <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Скачать</button></div>
       </div>
-      <div class="eco-node n-tasks" data-key="tasks" data-slogan="Задачи с гарантией оплаты" data-detail="Биржа для заказчиков и исполнителей: оплата удерживается до выполнения задачи, исполнитель получает деньги за результат, заказчик — защиту от пустых обещаний. Рейтинг и отзывы — честно.">
+      <div class="eco-node n-tasks" data-key="tasks" data-slogan="Задачи и исполнители — в одном окне" data-detail="Биржа для заказчиков и исполнителей: размещайте задачи, выбирайте исполнителя по рейтингу и отзывам, общайтесь во встроенном чате. Условно бесплатно — 1 заказ и 3 отклика в месяц, подписка Pro расширяет лимиты.">
         <div class="top"><span class="ico"><img src="img/tasks_icon.png" alt="" onerror="this.parentNode.textContent='📋'"></span><span class="nm">Биржа задач</span></div>
-        <div class="desc">Платите только за результат.</div>
+        <div class="desc">Задачи и исполнители — в одном месте.</div>
         <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Скачать</button></div>
       </div>
 
@@ -625,8 +641,8 @@
         </div>
         <div class="pm-card reveal" style="transition-delay:.12s">
           <div class="pm-name">Биржа</div>
-          <div class="pm-price">За результат</div>
-          <div class="pm-note">оплата исполнителю</div>
+          <div class="pm-price">Бесплатно</div>
+          <div class="pm-note">Pro — больше лимитов</div>
         </div>
       </div>
       <div style="text-align:center">
@@ -691,6 +707,10 @@
   <div id="tab-settings" class="tab-panel">
     <div id="settings-content"></div>
   </div>
+
+  <!-- ── РАЗДЕЛ ПРИЛОЖЕНИЯ (#app/<key>) — наполняет js/appdetail.js (хэш-роутер).
+       Это НЕ модалка: настоящий навигируемый раздел, активируется при #app/<key>. -->
+  <div id="tab-app" class="tab-panel"></div>
 
   <!-- ── О НАС ── -->
   <div id="tab-about" class="tab-panel">
@@ -903,8 +923,20 @@
   <div class="pc-foot"><span class="pc-badge" id="pc-badge"></span><span class="pc-cta" id="pc-cta"></span></div>
 </div>
 
-<!-- Полная карточка-страница приложения (наполняет js/appdetail.js → AppDetail.open(key)) -->
-<div id="app-detail" class="app-detail hidden" aria-hidden="true"></div>
+<!-- Раздел приложения теперь живёт во вкладке #tab-app (хэш-роутер js/appdetail.js),
+     а не в фуллскрин-оверлее. Старый модальный шелл #app-detail удалён. -->
+
+<!-- Боковые скролл-трассы: в пустых полях слева/справа от центральной колонки.
+     Пакеты/fill движутся по --scroll-progress (js/scrollfx.js). Узкие, fixed,
+     pointer-events:none; на узких экранах скрыты (см. css/main.css). -->
+<div class="side-fx side-fx-l" aria-hidden="true">
+  <span class="sf-rail"></span><span class="sf-fill"></span>
+  <span class="sf-pkt"></span><span class="sf-pkt"></span><span class="sf-pkt"></span>
+</div>
+<div class="side-fx side-fx-r" aria-hidden="true">
+  <span class="sf-rail"></span><span class="sf-fill"></span>
+  <span class="sf-pkt"></span><span class="sf-pkt"></span><span class="sf-pkt"></span>
+</div>
 
 <!-- Нижняя скролл-анимация: прогресс прокрутки → автоматизация.
      Механика (--scroll-progress) из js/scrollfx.js; визуал — ниже в css/main.css.

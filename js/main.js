@@ -319,8 +319,22 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById(`tab-${target}`)?.classList.add('active');
+      // Уход с app-роута (#app/<key>): чистим хэш и прячем #tab-app. Активную
+      // вкладку мы уже выставили выше — clearRoute её НЕ трогает.
+      if (window.AppDetail && AppDetail.clearRoute) AppDetail.clearRoute();
       requestAnimationFrame(_initReveal);
     });
+  });
+
+  // ── 1. Плитки «Инструменты экосистемы» (2D) кликабельны → раздел приложения ─
+  // В 3D-режиме планеты обрабатывает intro3d.js (плитки .eco-stage скрыты), здесь
+  // — только 2D. Делегат покрывает и сами плитки, и кнопку .eco-cta внутри них.
+  document.getElementById('eco-stage')?.addEventListener('click', e => {
+    if (document.body.classList.contains('mode-3d')) return;   // 3D — не наша зона
+    const tile = e.target.closest('.eco-node, .eco-core');
+    if (!tile) return;
+    const key = tile.dataset.key;
+    if (key && window.AppDetail && (window.APP_DATA || {})[key]) AppDetail.open(key);
   });
 
   // ── 1. Модальное окно авторизации ────────────────────────────────────
