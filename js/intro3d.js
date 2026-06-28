@@ -516,9 +516,68 @@ export function start(opts) {
     g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
     g.fillStyle = '#000'; g.fillRect(0, H * 0.32, W, H * 0.34);
     const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 6);   // 6 окон вдоль трубы
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 6);   // шаблон-окна (клон на трубу → свой repeat)
     return t;
   })();
+
+  // ── Хардвер труб: гильза-стекло, муфты/фланцы, коннекторы-раструбы + ОПОРЫ ──
+  //    (несущая спайн-балка + хомуты со стойками). Весь хардвер живёт в ОТДЕЛЬНОЙ
+  //    группе `rig` (world-space, РАВНОМЕРНЫЕ матрицы инстансов), НЕ ребёнком
+  //    неравномерно-масштабируемого n.tube → не растягивается в эллипс. Матрицы
+  //    считаются на layout/resize (планеты статичны), НЕ в кадре. Тёмный матовый
+  //    «gunmetal» (ниже порога bloom 0.18) = холодная рама вокруг горячей энергии.
+  const CORE_R = 1.6;                                  // радиус ядра (вход трубы)
+  const SPINE_OFF = tubeR * 2.4;                       // смещение спайн-балки «вниз» от оси трубы
+  const CONN_CORE = 1.8, CONN_PLANET = 1.05;           // масштаб раструбов (у ядра крупнее)
+
+  // Тонкая нормаль-карта кожуха: продольные штрихи + кольцевые риски (брашд-металл).
+  const tubeNormalTex = (function () {
+    const W = 128, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#8080ff'; g.fillRect(0, 0, W, H);                 // плоская нормаль (RGB ~128,128,255)
+    for (let i = 0; i < 26; i++) {                                    // продольные штрихи (вдоль трубы)
+      const x = Math.random() * W, w = 1 + Math.random() * 2;
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(118,128,255,0.5)' : 'rgba(140,128,255,0.5)';
+      g.fillRect(x, 0, w, H);
+    }
+    for (let i = 0; i < 10; i++) {                                    // кольцевые риски (поперёк)
+      const y = Math.random() * H;
+      g.fillStyle = Math.random() < 0.5 ? 'rgba(128,116,255,0.45)' : 'rgba(128,140,255,0.45)';
+      g.fillRect(0, y, W, 1 + Math.random() * 1.5);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; t.repeat.set(2, 6);
+    return t;
+  })();
+
+  // Стеклянная гильза: тёмно-винный тинт между энергией (0.62) и кожухом (1.0).
+  // Ребёнок n.tube (цилиндр-труба — равномерных требований нет), общий гео+материал.
+  const glassSleeveGeo = new THREE.CylinderGeometry(tubeR * 0.72, tubeR * 0.72, 1, 18, 1, true);
+  const glassSleeveMat = new THREE.MeshStandardMaterial({
+    color: 0x401015, transparent: true, opacity: 0.22, roughness: 0.12, metalness: 0.0,
+    envMapIntensity: 1.6, side: THREE.DoubleSide, depthWrite: false,
+  });
+
+  // Общий тёмный материал хардвера (муфты/коннекторы/балки/хомуты/стойки).
+  // transparent+opacity → общий fade рига с трубами (intro-reveal / фокус / выбор ядра).
+  const gunmetalMat = new THREE.MeshStandardMaterial({
+    color: 0x1c1e26, metalness: 0.9, roughness: 0.4, envMapIntensity: 1.0, transparent: true,
+  });
+
+  // Геометрии хардвера (по 1 на тип → InstancedMesh, ~5 draw call на все 7 труб).
+  const flangeGeo    = new THREE.TorusGeometry(tubeR * 1.38, tubeR * 0.30, 8, 20);   // муфта-кольцо (ось Z)
+  const clampGeo     = new THREE.TorusGeometry(tubeR * 1.18, tubeR * 0.26, 8, 18);   // хомут-манжета (ось Z)
+  const connectorGeo = new THREE.CylinderGeometry(tubeR, tubeR * 2.2, tubeR * 4, 16, 1);  // раструб (узкий→широкий)
+  const spineGeo     = new THREE.CylinderGeometry(tubeR * 0.5, tubeR * 0.5, 1, 8);   // спайн-балка (h=1, scale.y=длина)
+  const strutGeo     = new THREE.CylinderGeometry(tubeR * 0.22, tubeR * 0.22, 1, 8); // стойка хомут→спайн
+
+  const rig = new THREE.Group(); world.add(rig);       // world-space → крутится с системой
+  let flangeInst = null, clampInst = null, strutInst = null, spineInst = null, connectorInst = null;
+  // Временные для матриц рига (используются ТОЛЬКО на layout/resize, НЕ в кадре).
+  const _rY = new THREE.Vector3(0, 1, 0), _rZ = new THREE.Vector3(0, 0, 1);
+  const _rDownW = new THREE.Vector3(0, -1, 0), _rAltW = new THREE.Vector3(1, 0, 0);
+  const _rDir = new THREE.Vector3(), _rDown = new THREE.Vector3(), _rAxis = new THREE.Vector3();
+  const _rPos = new THREE.Vector3(), _rScl = new THREE.Vector3(), _rQ = new THREE.Quaternion(), _rM = new THREE.Matrix4();
 
   // ── Планеты-продукты: фиксированная раскладка по всему экрану ──────────
   // Нормированные позиции (-1..1) по ширине/высоте — каждой планете свой угол
@@ -589,15 +648,19 @@ export function start(opts) {
       new THREE.CylinderGeometry(tubeR * 0.62, tubeR * 0.62, 1, 14, 1, true),
       new THREE.MeshBasicMaterial({ map: energyTex })
     );
+    // Окна с ОДИНАКОВЫМ шагом на всех трубах: клон alphaMap, repeat.y под длину (в updateRig).
+    const shellTex = glassTex.clone(); shellTex.needsUpdate = true;
     const tubeShell = new THREE.Mesh(
       new THREE.CylinderGeometry(tubeR, tubeR, 1, 22, 1, true),
       new THREE.MeshStandardMaterial({
         color: 0x24262f, metalness: 0.96, roughness: 0.28, envMapIntensity: 1.15,
-        alphaMap: glassTex, alphaTest: 0.5,
+        alphaMap: shellTex, alphaTest: 0.5, side: THREE.DoubleSide,   // DoubleSide → видна толщина стенки в вырезе
+        normalMap: tubeNormalTex, normalScale: new THREE.Vector2(0.35, 0.35),
       })
     );
+    const tubeGlass = new THREE.Mesh(glassSleeveGeo, glassSleeveMat);   // тёмно-винная гильза (ребёнок трубы)
     const tube = new THREE.Group();
-    tube.add(tubeEnergy); tube.add(tubeShell);
+    tube.add(tubeEnergy); tube.add(tubeGlass); tube.add(tubeShell);
     tube.scale.set(0, 0.001, 0);                         // спрятана до раскрытия (радиус 0)
     world.add(tube);
 
@@ -613,6 +676,7 @@ export function start(opts) {
 
     return {
       key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams, tube,
+      pradius, shellTex, _stations: 4,                   // для рига: радиус планеты, клон окон, число станций
       nx, ny, nz, home: new THREE.Vector3(), target: new THREE.Vector3(),
       ax, ay, az, fx, fy, fz, ph, py, pz, revealed: false,
     };
@@ -763,8 +827,87 @@ export function start(opts) {
     camera.aspect = w / h; camera.updateProjectionMatrix();
     baseDist = fitDistance();
     layoutHomes();
+    if (flangeInst) updateRig();                        // пересчёт матриц рига под новый вьюпорт
   }
+
+  // ── Риг труб: построение InstancedMesh-ей (1 раз) + расчёт матриц (layout/resize) ──
+  // Матрицы — в world-space по target-раскладке (планеты статичны после раскладки).
+  // Хардвер НЕ ребёнок растянутого n.tube → равномерные инстансы, без эллипсов.
+  // Reveal — общим fade в кадре (gunmetalMat.opacity), не rebuild.
+  function buildRig() {
+    let total = 0;
+    for (const n of nodes) {
+      const L = Math.max(0.001, n.target.length());
+      const windows = Math.max(3, Math.round(L / 0.6));            // окно ≈ 0.6 ед
+      n._stations = clampv(Math.round(windows / 2), 3, 5);         // станция каждые ~2 окна (3–5)
+      total += n._stations;
+    }
+    flangeInst    = new THREE.InstancedMesh(flangeGeo,    gunmetalMat, total);
+    clampInst     = new THREE.InstancedMesh(clampGeo,     gunmetalMat, total);
+    strutInst     = new THREE.InstancedMesh(strutGeo,     gunmetalMat, total);
+    spineInst     = new THREE.InstancedMesh(spineGeo,     gunmetalMat, nodes.length);
+    connectorInst = new THREE.InstancedMesh(connectorGeo, gunmetalMat, nodes.length * 2);
+    [flangeInst, clampInst, strutInst, spineInst, connectorInst].forEach((m) => {
+      m.frustumCulled = false; rig.add(m);              // спаны рига крупные/смещённые — не кулим по сфере инстанса
+    });
+    updateRig();
+  }
+
+  function updateRig() {
+    if (!flangeInst) return;
+    let fi = 0;                                          // бегущий индекс станций (flange/clamp/strut общий)
+    for (let i = 0; i < nodes.length; i++) {
+      const n = nodes[i];
+      const L = Math.max(0.001, n.target.length());
+      const pr = n.pradius;
+      _rDir.copy(n.target).multiplyScalar(1 / L);        // направление ядро→планета (world)
+      if (n.shellTex) n.shellTex.repeat.set(1, Math.max(3, Math.round(L / 0.6)));  // окна: одинаковый шаг
+      // «низ» трубы: фиксированный перпендикуляр к оси (для спайна и стоек)
+      _rDown.copy(_rDownW).addScaledVector(_rDir, -_rDir.dot(_rDownW));
+      if (_rDown.lengthSq() < 1e-4) _rDown.copy(_rAltW).addScaledVector(_rDir, -_rDir.dot(_rAltW));
+      _rDown.normalize();
+      const cH = tubeR * 4 * CONN_CORE, pH = tubeR * 4 * CONN_PLANET;
+      // Коннектор-раструб у ядра (широким концом в ядро, узким к трубе): ось +Y → dir
+      _rQ.setFromUnitVectors(_rY, _rDir);
+      _rPos.copy(_rDir).multiplyScalar(CORE_R * 0.92 + cH * 0.5);
+      _rScl.setScalar(CONN_CORE);
+      _rM.compose(_rPos, _rQ, _rScl); connectorInst.setMatrixAt(i * 2, _rM);
+      // Коннектор-раструб у планеты (ось +Y → −dir: широкий конец входит в сферу планеты)
+      _rAxis.copy(_rDir).negate(); _rQ.setFromUnitVectors(_rY, _rAxis);
+      _rPos.copy(_rDir).multiplyScalar(L - pr * 0.92 - pH * 0.5);
+      _rScl.setScalar(CONN_PLANET);
+      _rM.compose(_rPos, _rQ, _rScl); connectorInst.setMatrixAt(i * 2 + 1, _rM);
+      // Несущая спайн-балка: от поверхности ядра до поверхности планеты, смещена «вниз»
+      const t0 = CORE_R * 0.96 + cH, t1 = (L - pr * 0.96) - pH;
+      const span = Math.max(0.001, t1 - t0);
+      _rQ.setFromUnitVectors(_rY, _rDir);
+      _rPos.copy(_rDir).multiplyScalar((t0 + t1) * 0.5).addScaledVector(_rDown, SPINE_OFF);
+      _rScl.set(1, span, 1);
+      _rM.compose(_rPos, _rQ, _rScl); spineInst.setMatrixAt(i, _rM);
+      // Станции: муфта (Z→dir) + хомут (Z→dir, концентрично) + стойка (Y→down) к спайну
+      const cnt = n._stations;
+      for (let s = 0; s < cnt; s++) {
+        const t = t0 + span * (s + 0.5) / cnt;
+        _rQ.setFromUnitVectors(_rZ, _rDir); _rPos.copy(_rDir).multiplyScalar(t); _rScl.setScalar(1);
+        _rM.compose(_rPos, _rQ, _rScl);
+        flangeInst.setMatrixAt(fi, _rM); clampInst.setMatrixAt(fi, _rM);
+        const a = tubeR * 1.3, b = SPINE_OFF;             // стойка: от низа хомута до спайн-балки
+        _rQ.setFromUnitVectors(_rY, _rDown);
+        _rPos.copy(_rDir).multiplyScalar(t).addScaledVector(_rDown, (a + b) * 0.5);
+        _rScl.set(1, Math.max(0.001, b - a), 1);
+        _rM.compose(_rPos, _rQ, _rScl); strutInst.setMatrixAt(fi, _rM);
+        fi++;
+      }
+    }
+    connectorInst.instanceMatrix.needsUpdate = true;
+    spineInst.instanceMatrix.needsUpdate = true;
+    flangeInst.instanceMatrix.needsUpdate = true;
+    clampInst.instanceMatrix.needsUpdate = true;
+    strutInst.instanceMatrix.needsUpdate = true;
+  }
+
   onResize();
+  buildRig();
 
   // ── Параллакс + вращение системы мышью (ЛКМ) + зум колесом ────────────
   let mx = 0, my = 0, tmx = 0, tmy = 0;
@@ -1133,6 +1276,15 @@ export function start(opts) {
       }
     }
 
+    // Хардвер труб (риг): общий fade с трубами — intro-reveal в финале интро + гаснет
+    // на фокусе/выборе ядра (как сами трубы). Дёшево: одна opacity на общий gunmetal.
+    if (flangeInst) {
+      const rb = phase === 'intro' ? clamp01((t - (END - 1400)) / 1400) : 1;
+      const rigVis = rb * (1 - fp) * (1 - coreDim);
+      rig.visible = rigVis > 0.012;
+      if (rig.visible) gunmetalMat.opacity = rigVis;
+    }
+
     starField.rotation.y += dt * 0.003;                 // медленный дрейф неба
     starMat.uniforms.uTime.value = tsec;                // мерцание звёзд
     energyTex.offset.y = (energyTex.offset.y - dt * 0.5) % 1;   // бег энергии по трубам к планетам
@@ -1248,7 +1400,7 @@ export function start(opts) {
       });
     } catch (e) {}
     if (scene.environment) texSet.add(scene.environment);     // PMREM-окружение
-    [glowTex, nebulaTex, circuitTex, energyTex, glassTex].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
+    [glowTex, nebulaTex, circuitTex, energyTex, glassTex, tubeNormalTex].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
     texSet.forEach((t) => { try { if (t.dispose) t.dispose(); } catch (e) {} });
     try { if (composer.dispose) composer.dispose(); } catch (e) {}
     try { pmrem.dispose(); } catch (e) {}
