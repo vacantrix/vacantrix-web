@@ -490,19 +490,13 @@ export function start(opts) {
   coreGroup.add(coreHalo);
   coreGroup.add(makeAtmosphere(1.6, ACCENT));            // back-lit лимб ядра (следует за пульсом coreGroup)
 
-  const rings = [];
-  // Орбитальные плоскости («оси» системы) перестроены реалистично: РАЗНЫЕ наклоны и
-  // радиусы, как у настоящих орбит, а не почти-копланарные. [color, radius, rotX, rotZ, opacity].
-  [[0x4fd0ff, 2.8, 1.18, 0.10, 0.16], [0x9b6bff, 3.7, 1.34, -0.24, 0.12],
-   [0x57d1ff, 4.7, 1.01, 0.30, 0.09], [0xff6ab0, 5.7, 1.46, 0.06, 0.06]]
-    .forEach(([col, r, rx, rz, op]) => {
-      const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(r, 0.011, 8, 220),
-        new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op })
-      );
-      ring.rotation.x = rx; ring.rotation.z = rz;
-      world.add(ring); rings.push(ring);
-    });
+  // Кольца теперь ПЕРСОНАЛЬНЫЕ — по одному на планету. Кольцо центрировано в ядре,
+  // его радиус = расстоянию до планеты, а плоскость проходит через планету → продевает
+  // её по диаметру («её орбита»). Геометрия/ориентация считаются в layoutRings() из
+  // позиции планеты (отзывчиво к экрану). Статичны: без вращения кольца и без хода
+  // планеты по нему. Временные векторы/матрица для ориентации базиса орбиты:
+  const _rd = new THREE.Vector3(), _re2 = new THREE.Vector3(), _rn = new THREE.Vector3(),
+        _rup = new THREE.Vector3(), _rmat = new THREE.Matrix4();
 
   // ── Планеты-продукты: фиксированная раскладка по всему экрану ──────────
   // Нормированные позиции (-1..1) по ширине/высоте — каждой планете свой угол
@@ -565,6 +559,14 @@ export function start(opts) {
     grp.scale.setScalar(0.001);                        // спрятан до раскрытия
     world.add(grp);
 
+    // Персональное кольцо-орбита планеты (радиус/ориентация задаются в layoutRings).
+    // depthTest=on → ядро/планета перекрывают дальнюю часть кольца (эффект продевания).
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1, 0.02, 8, 160),
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false })
+    );
+    world.add(ring);
+
     const lineGeo = new THREE.BufferGeometry();
     lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
     const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({
@@ -576,7 +578,7 @@ export function start(opts) {
     world.add(pulse);
 
     return {
-      key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams,
+      key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams, ring,
       nx, ny, nz, home: new THREE.Vector3(), target: new THREE.Vector3(),
       ax, ay, az, fx, fy, fz, ph, py, pz, revealed: false,
     };
@@ -616,15 +618,25 @@ export function start(opts) {
       if (!laidOut) n.home.copy(n.target);
     }
     laidOut = true;
+    layoutRings();
   }
 
-  // Текущая позиция = точка покоя + лёгкое покачивание (малая амплитуда).
-  function floatPos(n, t) {
-    return tmp.set(
-      n.home.x + Math.sin(t * n.fx + n.ph) * n.ax,
-      n.home.y + Math.sin(t * n.fy + n.py) * n.ay,
-      n.home.z + Math.sin(t * n.fz + n.pz) * n.az
-    );
+  // Подгоняем каждое кольцо под свою планету: радиус = |target|, плоскость орбиты
+  // содержит планету (ось +X тора смотрит на неё) → кольцо продевает планету по
+  // диаметру. Статично; пересобираем геометрию только при смене раскладки (resize).
+  function layoutRings() {
+    for (const n of nodes) {
+      const R = n.target.length() || 1;
+      _rd.copy(n.target).normalize();
+      _rup.set(0, 1, 0);
+      if (Math.abs(_rd.dot(_rup)) > 0.95) _rup.set(1, 0, 0);    // планета у полюса → другой опорный
+      _re2.crossVectors(_rd, _rup).normalize();                  // касательная орбиты (⟂ радиусу)
+      _rn.crossVectors(_rd, _re2).normalize();                   // нормаль плоскости орбиты
+      _rmat.makeBasis(_rd, _re2, _rn);
+      n.ring.quaternion.setFromRotationMatrix(_rmat);
+      if (n.ring.geometry) n.ring.geometry.dispose();
+      n.ring.geometry = new THREE.TorusGeometry(R, 0.02, 8, 160);
+    }
   }
 
   // ── Звёздное небо: 3 слоя точек с цветовой температурой + мерцанием ──────
@@ -1042,7 +1054,6 @@ export function start(opts) {
     coreHalo.material.rotation += dt * 0.03;
     coreHalo.scale.setScalar(15 * (0.92 + 0.08 * beat) * (0.5 + 0.5 * ig));
     corePoint.intensity = ig * 2.6;
-    rings.forEach((r, i) => { r.rotation.z += dt * (0.05 + i * 0.018); });
     coreDim += ((coreSel ? 1 : 0) - coreDim) * Math.min(1, dt * 5);   // Platform выбран → продукты гаснут
     { const m = coreSeams.material;                      // швы ядра пульсируют при фокусе ИЛИ выборе Platform
       const tgt = (focusEntry === coreEntry || coreSel) ? (0.5 + 0.5 * Math.sin(tsec * 4.5)) : 0;
@@ -1054,8 +1065,7 @@ export function start(opts) {
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       n.home.lerp(n.target, Math.min(1, dt * 2.6));      // плавная подстройка под экран
-      const p = floatPos(n, tsec);
-      if (focusRef) p.lerp(n.home, fp);                  // при фокусе планета замирает в home
+      const p = tmp.copy(n.home);                        // планета СТОИТ на своём кольце (без дрейфа/хода)
       n.grp.position.copy(p);
       n.core.rotation.y += dt * n.spin;                  // вращается светящееся ядро
 
@@ -1086,9 +1096,12 @@ export function start(opts) {
         if (k >= 1 && !n.revealed) { n.revealed = true; revealKey(n.key); if (i === 0) revealCore(); }
         const grow = clamp01((t - (tStart + PULSE_DUR - 120)) / 360);
         n.grp.scale.setScalar(ease(grow));
+        n.ring.material.opacity = 0.26 * ease(grow);
         n.halo.material.opacity = ease(grow) * 0.85;
       } else {
-        n.grp.scale.setScalar((focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim));
+        const vis = (focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim);
+        n.grp.scale.setScalar(vis);
+        n.ring.material.opacity = 0.26 * vis;             // кольцо гаснет вместе со своей планетой
         n.halo.material.opacity = 0.58 + 0.06 * Math.sin(tsec * 0.6 + i);   // лёгкое «дыхание»
         n.halo.material.rotation += dt * (0.035 + (i % 3) * 0.012);          // медленное вращение облака
 
