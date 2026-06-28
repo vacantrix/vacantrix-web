@@ -490,13 +490,35 @@ export function start(opts) {
   coreGroup.add(coreHalo);
   coreGroup.add(makeAtmosphere(1.6, ACCENT));            // back-lit лимб ядра (следует за пульсом coreGroup)
 
-  // Кольца теперь ПЕРСОНАЛЬНЫЕ — по одному на планету. Кольцо центрировано в ядре,
-  // его радиус = расстоянию до планеты, а плоскость проходит через планету → продевает
-  // её по диаметру («её орбита»). Геометрия/ориентация считаются в layoutRings() из
-  // позиции планеты (отзывчиво к экрану). Статичны: без вращения кольца и без хода
-  // планеты по нему. Временные векторы/матрица для ориентации базиса орбиты:
-  const _rd = new THREE.Vector3(), _re2 = new THREE.Vector3(), _rn = new THREE.Vector3(),
-        _rup = new THREE.Vector3(), _rmat = new THREE.Matrix4();
+  // ── Энерго-трубы ядро→планета: металлический кожух со стеклянными окнами, сквозь ──
+  //    которые видно бегущую внутри КРАСНУЮ энергию. Текстуры общие на все трубы.
+  const tubeR = 0.06;
+  const _yAxis = new THREE.Vector3(0, 1, 0), _td = new THREE.Vector3();
+  // Поток энергии: почти чёрно-красная база + бегущие яркие импульсы (анимируем offset.y).
+  const energyTex = (function () {
+    const W = 8, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#180206'; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 3; i++) {
+      const y = (i + 0.5) / 3 * H, r = H * 0.17;
+      const grd = g.createLinearGradient(0, y - r, 0, y + r);
+      grd.addColorStop(0, '#180206'); grd.addColorStop(0.5, '#ff5a64'); grd.addColorStop(1, '#180206');
+      g.fillStyle = grd; g.fillRect(0, y - r, W, r * 2);
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  // Окна-стекло: alphaMap кожуха — белое = металл (есть), чёрное = окно (дырка → видно энергию).
+  const glassTex = (function () {
+    const W = 8, H = 64, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#000'; g.fillRect(0, H * 0.32, W, H * 0.34);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 6);   // 6 окон вдоль трубы
+    return t;
+  })();
 
   // ── Планеты-продукты: фиксированная раскладка по всему экрану ──────────
   // Нормированные позиции (-1..1) по ширине/высоте — каждой планете свой угол
@@ -559,15 +581,25 @@ export function start(opts) {
     grp.scale.setScalar(0.001);                        // спрятан до раскрытия
     world.add(grp);
 
-    // Персональное кольцо-орбита планеты (радиус/ориентация задаются в layoutRings).
-    // depthTest=off + renderOrder → орбита рисуется ПОВЕРХ планеты → линия проходит
-    // ровно по середине планеты (через её центр), а не прячется за ней.
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(1, 0.02, 8, 160),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, depthTest: false })
+    // Энерго-труба ядро→планета. Оба цилиндра НЕПРОЗРАЧНЫ (чистый рендер без сортировки):
+    // внутри — поток энергии, снаружи — металлический кожух с окнами через alphaTest
+    // (дырки = стекло, видно энергию). Трансформ/радиус-проявление — в кадре. Торцы открыты
+    // (концы прячутся в ядре/планете). Высота 1 → масштабируется по длине трубы.
+    const tubeEnergy = new THREE.Mesh(
+      new THREE.CylinderGeometry(tubeR * 0.62, tubeR * 0.62, 1, 14, 1, true),
+      new THREE.MeshBasicMaterial({ map: energyTex })
     );
-    ring.renderOrder = 1;
-    world.add(ring);
+    const tubeShell = new THREE.Mesh(
+      new THREE.CylinderGeometry(tubeR, tubeR, 1, 22, 1, true),
+      new THREE.MeshStandardMaterial({
+        color: 0x24262f, metalness: 0.96, roughness: 0.28, envMapIntensity: 1.15,
+        alphaMap: glassTex, alphaTest: 0.5,
+      })
+    );
+    const tube = new THREE.Group();
+    tube.add(tubeEnergy); tube.add(tubeShell);
+    tube.scale.set(0, 0.001, 0);                         // спрятана до раскрытия (радиус 0)
+    world.add(tube);
 
     const lineGeo = new THREE.BufferGeometry();
     lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
@@ -580,7 +612,7 @@ export function start(opts) {
     world.add(pulse);
 
     return {
-      key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams, ring,
+      key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams, tube,
       nx, ny, nz, home: new THREE.Vector3(), target: new THREE.Vector3(),
       ax, ay, az, fx, fy, fz, ph, py, pz, revealed: false,
     };
@@ -620,25 +652,6 @@ export function start(opts) {
       if (!laidOut) n.home.copy(n.target);
     }
     laidOut = true;
-    layoutRings();
-  }
-
-  // Подгоняем каждое кольцо под свою планету: радиус = |target|, плоскость орбиты
-  // содержит планету (ось +X тора смотрит на неё) → кольцо продевает планету по
-  // диаметру. Статично; пересобираем геометрию только при смене раскладки (resize).
-  function layoutRings() {
-    for (const n of nodes) {
-      const R = n.target.length() || 1;
-      _rd.copy(n.target).normalize();
-      _rup.set(0, 1, 0);
-      if (Math.abs(_rd.dot(_rup)) > 0.95) _rup.set(1, 0, 0);    // планета у полюса → другой опорный
-      _re2.crossVectors(_rd, _rup).normalize();                  // касательная орбиты (⟂ радиусу)
-      _rn.crossVectors(_rd, _re2).normalize();                   // нормаль плоскости орбиты
-      _rmat.makeBasis(_rd, _re2, _rn);
-      n.ring.quaternion.setFromRotationMatrix(_rmat);
-      if (n.ring.geometry) n.ring.geometry.dispose();
-      n.ring.geometry = new THREE.TorusGeometry(R, 0.02, 8, 160);
-    }
   }
 
   // ── Звёздное небо: 3 слоя точек с цветовой температурой + мерцанием ──────
@@ -695,9 +708,9 @@ export function start(opts) {
     return new THREE.Points(g, starMat);
   }
   const starField = new THREE.Group();
-  starField.add(starLayer(2600, 90, 150, 1.2, 1.0, 0.70));    // дальний фон
-  starField.add(starLayer(1500, 50,  90, 1.8, 1.6, 0.95));    // средний
-  starField.add(starLayer(220,  40,  62, 2.6, 2.6, 1.45));    // ближние яркие (блумят)
+  starField.add(starLayer(4800, 95, 170, 0.9, 0.9, 0.66));    // дальний фон — БОЛЬШЕ мелких далёких звёзд
+  starField.add(starLayer(1300, 55,  92, 1.5, 1.4, 0.9));     // средний
+  starField.add(starLayer(70,   48,  68, 2.3, 2.0, 1.35));    // ближние яркие — МЕНЬШЕ (220→70)
   world.add(starField);
 
   // Мягкое центральное свечение: насыщает центр и плавно гаснет к краям —
@@ -1067,8 +1080,13 @@ export function start(opts) {
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       n.home.lerp(n.target, Math.min(1, dt * 2.6));      // плавная подстройка под экран
-      const p = tmp.copy(n.home);                        // планета СТОИТ на своём кольце (без дрейфа/хода)
+      const p = tmp.copy(n.home);                        // планета стоит на месте (без дрейфа)
       n.grp.position.copy(p);
+      // Труба ядро(0,0,0)→планета: центр посередине, ось Y вдоль направления, длина = |home|.
+      // Радиус (scale x/z) задаётся ниже по фазе (проявление / гаснет на зуме).
+      n.tube.position.copy(n.home).multiplyScalar(0.5);
+      n.tube.quaternion.setFromUnitVectors(_yAxis, _td.copy(n.home).normalize());
+      n.tube.scale.y = n.home.length() || 0.001;
       n.core.rotation.y += dt * n.spin;                  // вращается светящееся ядро
 
       // Швы куба: зажигаются и пульсируют при фокусе (клике) на планете.
@@ -1098,12 +1116,12 @@ export function start(opts) {
         if (k >= 1 && !n.revealed) { n.revealed = true; revealKey(n.key); if (i === 0) revealCore(); }
         const grow = clamp01((t - (tStart + PULSE_DUR - 120)) / 360);
         n.grp.scale.setScalar(ease(grow));
-        n.ring.material.opacity = 0.15 * ease(grow);     // траектория проявляется с планетой
+        n.tube.scale.x = n.tube.scale.z = ease(grow);    // труба «вырастает» с планетой
         n.halo.material.opacity = ease(grow) * 0.85;
       } else {
         const vis = (focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim);
         n.grp.scale.setScalar(vis);
-        n.ring.material.opacity = 0.15 * vis * (1 - fp);  // траектория планеты (тусклая); гаснет с планетой и на зуме
+        n.tube.scale.x = n.tube.scale.z = vis * (1 - fp);   // труба гаснет с планетой и на зуме
         n.halo.material.opacity = 0.58 + 0.06 * Math.sin(tsec * 0.6 + i);   // лёгкое «дыхание»
         n.halo.material.rotation += dt * (0.035 + (i % 3) * 0.012);          // медленное вращение облака
 
@@ -1117,6 +1135,7 @@ export function start(opts) {
 
     starField.rotation.y += dt * 0.003;                 // медленный дрейф неба
     starMat.uniforms.uTime.value = tsec;                // мерцание звёзд
+    energyTex.offset.y = (energyTex.offset.y - dt * 0.5) % 1;   // бег энергии по трубам к планетам
 
     // Скин-схема: у наведённой планеты «просыпается» неоновая электросхема (волной),
     // крутится вместе с планетой; у остальных — гаснет.
@@ -1229,7 +1248,7 @@ export function start(opts) {
       });
     } catch (e) {}
     if (scene.environment) texSet.add(scene.environment);     // PMREM-окружение
-    [glowTex, nebulaTex, circuitTex].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
+    [glowTex, nebulaTex, circuitTex, energyTex, glassTex].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
     texSet.forEach((t) => { try { if (t.dispose) t.dispose(); } catch (e) {} });
     try { if (composer.dispose) composer.dispose(); } catch (e) {}
     try { pmrem.dispose(); } catch (e) {}
