@@ -151,10 +151,11 @@ export function start(opts) {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   } catch (e) { settleStatic(); return false; }              // WebGL недоступен → 2D
   renderer.setClearColor(0x020105, 1);                 // тёмный космос (почти чёрный)
-  // Когда поверх сцены открыт раздел приложения (#app/<key>) — облегчаем фон:
-  // ниже DPR + пропуск bloom во frame → панель справа не лагает, планета слева жива.
-  let DPR_CAP = 2, appView = false;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
+  // Открыт раздел приложения (#app/<key>): камера фокус-зумится на планете и смещает
+  // её из-под правой панели (см. focusRef-блок и onHashView). Фокус схлопывает прочие
+  // планеты в 0 → сцена становится лёгкой (одна планета) — заодно снимает лаг панели.
+  let appView = false;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;                 // чуть светлее → лак/металл читаются ярче
   const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
@@ -644,7 +645,7 @@ export function start(opts) {
   }
   function onResize() {
     const w = window.innerWidth, h = window.innerHeight;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     // updateStyle=true (по умолчанию): Three сам ставит CSS-размер канваса = вьюпорт.
     // Иначе при zoom-out (devicePixelRatio<1) канвас схлопывается влево — сцена уезжает.
     renderer.setSize(w, h);
@@ -797,7 +798,10 @@ export function start(opts) {
     if (wasDrag) { wasDrag = false; return; }          // это было вращение, а не клик
     if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
     const picked = pickAt(e.clientX, e.clientY);
-    if (picked && window.AppDetail && window.AppDetail.open) window.AppDetail.open(picked.key);
+    if (picked) {
+      focusTarget = picked; appView = true;            // зум к планете + пульс швов («как было»)
+      if (window.AppDetail && window.AppDetail.open) window.AppDetail.open(picked.key);
+    }
   }
 
   // ── Наведение на планету: красная обводка + инфо-карточка ─────────────
@@ -926,7 +930,17 @@ export function start(opts) {
       const H = focusRef.home;
       const r = (focusRef.mesh.geometry.parameters.radius || 0.5) * focusRef.grp.scale.x;
       const gap = Math.max(3.0, r * 5.5);
-      fCam.x = H.x; fCam.y = H.y; fCam.z = H.z + gap; fLook.x = H.x; fLook.y = H.y; fLook.z = H.z;
+      // Открыт раздел-панель → уводим планету из-под неё: широкий экран (панель справа)
+      // → планета влево; узкий (нижний лист) → планета вверх. Камера смотрит в смещённую
+      // точку, поэтому планета уезжает к краю и не перекрывается панелью.
+      let offX = 0, offY = 0;
+      if (appView) {
+        const halfH = gap * Math.tan((camera.fov * Math.PI / 180) / 2);
+        if (window.innerWidth > 760) offX = 0.42 * halfH * camera.aspect;
+        else offY = -0.5 * halfH;
+      }
+      fCam.x = H.x + offX; fCam.y = H.y + offY; fCam.z = H.z + gap;
+      fLook.x = H.x + offX; fLook.y = H.y + offY; fLook.z = H.z;
     }
     // Цель НЕ обнуляется при сбросе focusRef → камера доезжает до дефолта без разрыва
     // позиции/скорости: fp плавно стремится к 0, цель остаётся прежней (при fp≈0 неважна).
@@ -1032,8 +1046,7 @@ export function start(opts) {
       if (selRing.material.opacity <= 0.02) selRing.visible = false;
     }
 
-    if (appView) renderer.render(scene, camera);        // раздел приложения открыт → дёшево (без bloom)
-    else composer.render();
+    composer.render();
 
     // Карточка следует за планетой (после render — матрицы свежие).
     if (hovered && phase === 'idle') positionCard(hovered);
@@ -1051,14 +1064,16 @@ export function start(opts) {
     else if (paused) { paused = false; last = 0; if (running) raf = requestAnimationFrame(frame); }
   }
 
-  // Открыт раздел приложения (#app/<key>) → сцена уходит в дешёвый фон: DPR=1 и без
-  // bloom (см. frame). Любой другой хэш → полное качество. Снимается через detach.
+  // Открыт раздел приложения (#app/<key>) → фокус-зум на соответствующую планету
+  // (пульс швов) + смещение из-под панели; уход с маршрута → камера возвращается домой.
   function onHashView() {
-    const a = /^#app\//.test(location.hash || '');
-    if (a === appView) return;
-    appView = a;
-    DPR_CAP = a ? 1 : 2;
-    onResize();                                         // применяет новый DPR ко всем буферам
+    const m = (location.hash || '').match(/^#app\/(.+)$/);
+    appView = !!m;
+    if (!m) { focusTarget = null; return; }             // ушли из раздела → камера домой
+    if (!focusTarget) {                                  // прямой заход по ссылке (без клика)
+      let key; try { key = decodeURIComponent(m[1]); } catch (e) { key = m[1]; }
+      focusTarget = hoverables.find(h => h.key === key) || null;
+    }
   }
 
   // ── Подцепка/снятие ВСЕХ слушателей (pause/resume/dispose) ─────────────
