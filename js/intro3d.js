@@ -877,12 +877,13 @@ export function start(opts) {
       _rPos.copy(_rDir).multiplyScalar(L - pr * 0.92 - pH * 0.5);
       _rScl.setScalar(CONN_PLANET);
       _rM.compose(_rPos, _rQ, _rScl); connectorInst.setMatrixAt(i * 2 + 1, _rM);
-      // Несущая спайн-балка: от поверхности ядра до поверхности планеты, смещена «вниз»
+      // Видимый пролёт (для станций-хомутов): от поверхности ядра до поверхности планеты.
       const t0 = CORE_R * 0.96 + cH, t1 = (L - pr * 0.96) - pH;
       const span = Math.max(0.001, t1 - t0);
+      // Несущая спайн-балка: ПОЛНОЙ длины трубы (равна основной трубе), смещена «вниз».
       _rQ.setFromUnitVectors(_rY, _rDir);
-      _rPos.copy(_rDir).multiplyScalar((t0 + t1) * 0.5).addScaledVector(_rDown, SPINE_OFF);
-      _rScl.set(1, span, 1);
+      _rPos.copy(_rDir).multiplyScalar(L * 0.5).addScaledVector(_rDown, SPINE_OFF);
+      _rScl.set(1, L, 1);
       _rM.compose(_rPos, _rQ, _rScl); spineInst.setMatrixAt(i, _rM);
       // Станции: муфта (Z→dir) + хомут (Z→dir, концентрично) + стойка (Y→down) к спайну
       const cnt = n._stations;
@@ -1201,16 +1202,14 @@ export function start(opts) {
     camera.position.set(lerp(0, fCam.x, fp), lerp(0, fCam.y, fp), lerp(dist, fCam.z, fp));
     camera.lookAt(lerp(0, fLook.x, fp), lerp(0, fLook.y, fp), lerp(0, fLook.z, fp));
 
-    // Ядро: зажигание (на интро) + вечный пульс и самовращение.
+    // Ядро: только зажигание на интро (ig) + реакции на фокус/выбор. БЕЗ вечного
+    // пульса/самовращения — Platform статична (выглядела неестественно).
     const ig = phase === 'intro' ? ease(clamp01((t - 150) / IGNITE)) : 1;
-    const beat = Math.sin(tsec * 1.7);
     const coreFocusK = (focusRef && focusRef !== coreEntry) ? Math.max(0, 1 - fp) : 1;
-    coreGroup.scale.setScalar((0.4 + 0.6 * ig) * (1 + beat * 0.05) * coreFocusK * (1 + coreDim * 0.12));
-    coreInner.material.emissiveIntensity = ig * (0.75 + beat * 0.18);
-    coreInner.rotation.y += dt * 0.25;
-    coreHalo.material.opacity = ig * (0.6 + beat * 0.1);
-    coreHalo.material.rotation += dt * 0.03;
-    coreHalo.scale.setScalar(15 * (0.92 + 0.08 * beat) * (0.5 + 0.5 * ig));
+    coreGroup.scale.setScalar((0.4 + 0.6 * ig) * coreFocusK * (1 + coreDim * 0.12));
+    coreInner.material.emissiveIntensity = ig * 0.78;
+    coreHalo.material.opacity = ig * 0.6;
+    coreHalo.scale.setScalar(15 * (0.5 + 0.5 * ig));
     corePoint.intensity = ig * 2.6;
     coreDim += ((coreSel ? 1 : 0) - coreDim) * Math.min(1, dt * 5);   // Platform выбран → продукты гаснут
     { const m = coreSeams.material;                      // швы ядра пульсируют при фокусе ИЛИ выборе Platform
@@ -1230,7 +1229,7 @@ export function start(opts) {
       n.tube.position.copy(n.home).multiplyScalar(0.5);
       n.tube.quaternion.setFromUnitVectors(_yAxis, _td.copy(n.home).normalize());
       n.tube.scale.y = n.home.length() || 0.001;
-      n.core.rotation.y += dt * n.spin;                  // вращается светящееся ядро
+      // планеты статичны — самовращение убрано (выглядело неестественно)
 
       // Швы куба: зажигаются и пульсируют при фокусе (клике) на планете.
       // Швы куба: зажигаются и пульсируют только при приближении (фокус/клик).
@@ -1265,8 +1264,7 @@ export function start(opts) {
         const vis = (focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim);
         n.grp.scale.setScalar(vis);
         n.tube.scale.x = n.tube.scale.z = vis * (1 - fp);   // труба гаснет с планетой и на зуме
-        n.halo.material.opacity = 0.58 + 0.06 * Math.sin(tsec * 0.6 + i);   // лёгкое «дыхание»
-        n.halo.material.rotation += dt * (0.035 + (i % 3) * 0.012);          // медленное вращение облака
+        n.halo.material.opacity = 0.58;                   // статичный ореол (без «дыхания»/вращения)
 
         // Обычная простая линия, связывающая ядро и планету.
         n.line.material.opacity = 0.16 * (1 - fp) * (1 - coreDim);   // гаснет при наезде/возврате и при выборе Platform
