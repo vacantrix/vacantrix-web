@@ -42,7 +42,7 @@ const NODE_COLORS = {
   hh: 0xff5a67, avito: 0x4fd0ff, tasks: 0x68e6a0, publisher: 0xff7a86,
   leads: 0xff9e57, monitor: 0x5ad1ff, analytics: 0xffd166,
 };
-const IMG_V = '?v=20260624c';                        // кэш-бастер иконок (обновляй при замене файла)
+const IMG_V = '?v=20260628a';                        // кэш-бастер иконок (обновляй при замене файла)
 const ICON = {
   platform: 'img/platform_icon.png' + IMG_V, hh: 'img/hh_icon.png' + IMG_V, avito: 'img/avito_icon.png' + IMG_V,
   tasks: 'img/tasks_icon.png' + IMG_V, publisher: 'img/publisher_icon.png' + IMG_V, leads: 'img/leads_icon.png' + IMG_V,
@@ -153,7 +153,7 @@ export function start(opts) {
   renderer.setClearColor(0x020105, 1);                 // тёмный космос (почти чёрный)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.82;                 // ещё немного темнее
+  renderer.toneMappingExposure = 0.95;                 // чуть светлее → лак/металл читаются ярче
   const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
   document.body.classList.add('planets-on');           // 3D активна → плитки eco-stage скрыты
 
@@ -235,7 +235,7 @@ export function start(opts) {
   // грань → 6 иконок покрывают всю поверхность (1 верх, 1 низ, 4 по экватору),
   // полюса корректные. Тонкий металлический шов между гранями. bumpMap+emissiveMap.
   function cubeIconTexture(url) {
-    const W = 640, H = 320;
+    const W = 1024, H = 512;
     const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
     const g = cv.getContext('2d');
     g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
@@ -243,7 +243,7 @@ export function start(opts) {
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = MAX_ANISO;
     const img = new Image();
     img.onload = () => {
-      const IS = 256, ic = document.createElement('canvas'); ic.width = ic.height = IS;
+      const IS = Math.min(img.naturalWidth || 512, 512), ic = document.createElement('canvas'); ic.width = ic.height = IS;
       const ig = ic.getContext('2d'); ig.drawImage(img, 0, 0, IS, IS);
       const id = ig.getImageData(0, 0, IS, IS).data;
       const out = g.getImageData(0, 0, W, H), od = out.data;
@@ -282,15 +282,48 @@ export function start(opts) {
   // Металлическая планета: полированный тёмный металл + вытравленная иконка с 2 сторон.
   function makeMetalPlanet(key, radius, color, emissive) {
     const tex = cubeIconTexture(ICON[key]);
-    const metal = new THREE.Color(color).lerp(new THREE.Color(0x24242c), 0.8);  // тёмный брендовый металл
+    const metal = new THREE.Color(color).lerp(new THREE.Color(0x24242c), 0.55);  // брендовый металл (цвет читается ярче)
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(radius, 64, 48),
-      new THREE.MeshStandardMaterial({
-        color: metal, metalness: 0.95, roughness: 0.46, envMapIntensity: 0.95,
+      new THREE.MeshPhysicalMaterial({
+        color: metal, metalness: 0.95, roughness: 0.32, envMapIntensity: 1.25,
+        clearcoat: 1.0, clearcoatRoughness: 0.18,                 // полированный лак → премиум-блик
         bumpMap: tex, bumpScale: 0.06, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: emissive,
       })
     );
     return mesh;
+  }
+
+  // ── Fresnel-атмосфера: тонкая back-lit оболочка вокруг планеты/ядра ─────
+  // BackSide + additive: свечение концентрируется на силуэте (лимб атмосферы).
+  // Без текстур → дёшево; ребёнок группы планеты/ядра → масштабируется с reveal/пульсом
+  // и попадает под scene.traverse в _teardownGPU (geometry + material dispose).
+  function makeAtmosphere(radius, color) {
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(color) },
+        uPower: { value: 3.0 }, uStrength: { value: 1.3 },
+      },
+      vertexShader: `
+        varying vec3 vN; varying vec3 vV;
+        void main() {
+          vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          vN = normalize(normalMatrix * normal);
+          vV = normalize(-mv.xyz);
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: `
+        precision mediump float;
+        uniform vec3 uColor; uniform float uPower; uniform float uStrength;
+        varying vec3 vN; varying vec3 vV;
+        void main() {
+          float f = pow(1.0 - abs(dot(vN, vV)), uPower);
+          gl_FragColor = vec4(uColor * uStrength * f, f);
+        }`,
+      transparent: true, blending: THREE.AdditiveBlending,
+      depthWrite: false, side: THREE.BackSide,
+    });
+    return new THREE.Mesh(new THREE.SphereGeometry(radius * 1.04, 40, 28), mat);
   }
 
   // Светящиеся линии ПО ШВАМ куба (рёбра куба, спроецированные на сферу).
@@ -430,6 +463,7 @@ export function start(opts) {
   coreMesh.add(coreCircuit.mesh);
   const coreHalo = glowSprite(0xff5a67, 16, 0, nebulaTex);
   coreGroup.add(coreHalo);
+  coreGroup.add(makeAtmosphere(1.6, ACCENT));            // back-lit лимб ядра (следует за пульсом coreGroup)
 
   const rings = [];
   // орбиты под общим наклоном (плоскость, согласованная с наклоном ядра) → видны как эллипсы
@@ -490,6 +524,7 @@ export function start(opts) {
     const halo = glowSprite(color, pradius * 4.8, 0, nebulaTex);
     halo.material.rotation = Math.random() * 6.2831853;   // своя фаза «облака»
     grp.add(halo);
+    grp.add(makeAtmosphere(pradius, color));           // back-lit лимб в цвете планеты (масштабируется с reveal grp)
     grp.scale.setScalar(0.001);                        // спрятан до раскрытия
     world.add(grp);
 
