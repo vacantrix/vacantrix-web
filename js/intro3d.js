@@ -153,8 +153,17 @@ export function start(opts) {
   let appView = false;                                 // открыт раздел #app/<key> → фокус-зум на чип
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.98;
+  renderer.toneMappingExposure = 0.92;
   const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
+  // perf-тир: мобильные/маленькие/слабые → меньше текстуры, без normal-map, DPR-кап 1.5
+  const LOWQ = (function () {
+    try {
+      const mob = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      const small = Math.min(window.innerWidth, window.innerHeight) < 560;
+      return mob || small || (navigator.hardwareConcurrency || 8) <= 4;
+    } catch (e) { return false; }
+  })();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOWQ ? 1.5 : 2));
   document.body.classList.add('planets-on');           // 3D активна → плитки eco-stage скрыты
 
   const scene = new THREE.Scene();
@@ -190,14 +199,14 @@ export function start(opts) {
   const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
   keyLight.position.set(3, 7, 6);
   scene.add(keyLight);
-  const rimLight = new THREE.DirectionalLight(0xff4858, 0.7);
+  const rimLight = new THREE.DirectionalLight(0x5a6a9a, 0.34);   // холодный приглушённый rim (не красит плату красным)
   rimLight.position.set(-5, 2, -4);
   scene.add(rimLight);
 
   // bloom-постобработка (CPU-ядро + ток по дорожкам светятся)
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.62, 0.5, 0.18);
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.8, 0.5, 0.62);   // высокий порог → цветёт только яркий красный (ток/CPU), не золото
   composer.addPass(bloomPass);
 
   // ── Радиальный glow-спрайт (общая текстура) ───────────────────────────
@@ -220,22 +229,6 @@ export function start(opts) {
     return s;
   }
 
-  // ── Поток энергии (бегущий красный ток в дорожках) ────────────────────
-  // Почти чёрно-красная база + бегущие яркие импульсы (анимируем offset.y).
-  const energyTex = (function () {
-    const W = 8, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
-    const g = c.getContext('2d');
-    g.fillStyle = '#120307'; g.fillRect(0, 0, W, H);
-    for (let i = 0; i < 3; i++) {
-      const y = (i + 0.5) / 3 * H, r = H * 0.16;
-      const grd = g.createLinearGradient(0, y - r, 0, y + r);
-      grd.addColorStop(0, accRGBA(0)); grd.addColorStop(0.5, accRGBA(1)); grd.addColorStop(1, accRGBA(0));
-      g.fillStyle = grd; g.fillRect(0, y - r, W, r * 2);
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  })();
 
   // ── Иконка инструмента → текстура (прозрачный фон, на верхнюю грань чипа) ──
   function iconTexture(url) {
@@ -254,59 +247,319 @@ export function start(opts) {
     return tex;
   }
 
-  // ── Текстуры платы: гетинакс + красные PCB-трейсы (map + emissive-маска) ──
-  // Трейсы — Manhattan-блуждания + контактные площадки. Красный — только из ACCENT.
-  function makeBoardTextures() {
-    const S = 1024;
-    const mc = document.createElement('canvas'); mc.width = mc.height = S; const mg = mc.getContext('2d');
-    const ec = document.createElement('canvas'); ec.width = ec.height = S; const eg = ec.getContext('2d');
-    mg.fillStyle = '#0a0f0c'; mg.fillRect(0, 0, S, S);                 // тёмный гетинакс
-    eg.fillStyle = '#000'; eg.fillRect(0, 0, S, S);                   // emissive: чёрная база
-    mg.lineCap = 'round'; eg.lineCap = 'round';
-    const D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    function walk(x, y, steps, lw) {
-      mg.lineWidth = lw; eg.lineWidth = lw;
-      mg.strokeStyle = 'rgba(' + ((_AR * 0.5) | 0) + ',' + ((_AG * 0.35) | 0) + ',' + ((_AB * 0.38) | 0) + ',0.55)';
-      eg.strokeStyle = accRGBA(0.85);
-      mg.beginPath(); eg.beginPath(); mg.moveTo(x, y); eg.moveTo(x, y);
-      let d = (Math.random() * 4) | 0;
-      for (let s = 0; s < steps; s++) {
-        if (Math.random() < 0.3) d = (Math.random() * 4) | 0;
-        const len = 14 + Math.random() * 46;
-        x = clampv(x + D[d][0] * len, 0, S); y = clampv(y + D[d][1] * len, 0, S);
-        mg.lineTo(x, y); eg.lineTo(x, y);
-      }
-      mg.stroke(); eg.stroke();
+  // ── Реалистичная печатная плата: один процедурный layout → много каналов ──
+  // Разводка/пады/via/шелкография/полигоны генерируются ОДИН раз (detерм. seed),
+  // затем рендерятся в albedo / height→normal / roughness / metalness — пиксели
+  // совпадают идеально. В БАЗЕ красного НЕТ: тёмная маска + медь + золото (ENIG).
+  // Красный приходит позже — только бегущим током (шейдер) поверх трасс.
+  function rngF(seed) { let s = (seed >>> 0) || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+  // Октилинейный (Manhattan + 45°) маршрут — «настоящая» PCB-разводка.
+  function routePCB(x0, y0, x1, y1, R) {
+    const pts = [[x0, y0]]; let x = x0, y = y0, guard = 0;
+    while ((Math.abs(x - x1) > 0.006 || Math.abs(y - y1) > 0.006) && guard++ < 26) {
+      const dx = x1 - x, dy = y1 - y, adx = Math.abs(dx), ady = Math.abs(dy), diag = Math.min(adx, ady);
+      if (diag > 0.018 && R() < 0.78) { x += Math.sign(dx) * diag; y += Math.sign(dy) * diag; }     // 45°-срез
+      else if (adx > ady) { x += dx * (0.5 + R() * 0.5); }
+      else { y += dy * (0.5 + R() * 0.5); }
+      pts.push([x, y]);
     }
-    for (let i = 0; i < 130; i++) walk(Math.random() * S, Math.random() * S, 3 + (Math.random() * 5 | 0), Math.random() < 0.2 ? 5 : 3);
-    // контактные площадки (pads) — ярче на emissive
-    for (let i = 0; i < 90; i++) {
-      const x = Math.random() * S, y = Math.random() * S, r = 3 + Math.random() * 5;
-      mg.fillStyle = accRGBA(0.4); eg.fillStyle = accRGBA(0.95);
-      mg.beginPath(); mg.arc(x, y, r, 0, 7); mg.fill();
-      eg.beginPath(); eg.arc(x, y, r, 0, 7); eg.fill();
-    }
-    const mk = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t; };
-    return { map: mk(mc), emis: mk(ec) };
+    pts.push([x1, y1]); return pts;
   }
 
-  // ── Геометрия наклонённой платы ───────────────────────────────────────
-  const BOARD_TILT = 0.6;                              // наклон платы (вид «на стол под углом»)
+  // Нормализованный layout (координаты 0..1). centerKeep — зона CPU в центре.
+  function generatePCBLayout() {
+    const R = rngF(0x5ac3f1);
+    const cx = 0.5, cy = 0.5, centerKeep = 0.155;
+    const inKeep = (x, y) => Math.hypot(x - cx, y - cy) < centerKeep;
+    const traces = [], pads = [], vias = [], silk = [], pours = [], comps = [];
+    // 1) медные полигоны-заливки (фон-«земля» под маской)
+    for (let i = 0; i < 8; i++) {
+      const w = 0.16 + R() * 0.22, h = 0.14 + R() * 0.22;
+      pours.push({ x: R() * (1 - w), y: R() * (1 - h), w, h });
+    }
+    // 2) главные шины из центра наружу (имитируют разводку к чипам)
+    const busN = 20;
+    for (let i = 0; i < busN; i++) {
+      const ang = (i / busN) * Math.PI * 2 + R() * 0.18;
+      const r0 = centerKeep + 0.015, r1 = 0.30 + R() * 0.18;
+      const x0 = cx + Math.cos(ang) * r0, y0 = cy + Math.sin(ang) * r0;
+      const x1 = clampv(cx + Math.cos(ang) * r1, 0.05, 0.95), y1 = clampv(cy + Math.sin(ang) * r1, 0.05, 0.95);
+      traces.push({ pts: routePCB(x0, y0, x1, y1, R), w: 0.0030 + R() * 0.0020, main: true });
+      pads.push({ x: x1, y: y1, r: 0.0055 + R() * 0.004, gold: true });
+      vias.push({ x: x1, y: y1, r: 0.0034 });
+    }
+    // 3) вторичные/декоративные трассы
+    for (let i = 0; i < 130; i++) {
+      const x0 = 0.05 + R() * 0.9, y0 = 0.05 + R() * 0.9;
+      const x1 = clampv(x0 + (R() * 2 - 1) * 0.26, 0.05, 0.95), y1 = clampv(y0 + (R() * 2 - 1) * 0.26, 0.05, 0.95);
+      if (inKeep(x0, y0) || inKeep(x1, y1)) continue;
+      traces.push({ pts: routePCB(x0, y0, x1, y1, R), w: 0.0015 + R() * 0.0014, main: false });
+      if (R() < 0.45) vias.push({ x: x0, y: y0, r: 0.0028 });
+      if (R() < 0.45) vias.push({ x: x1, y: y1, r: 0.0028 });
+    }
+    // 4) пады + via-поля
+    for (let i = 0; i < 150; i++) {
+      const x = 0.04 + R() * 0.92, y = 0.04 + R() * 0.92;
+      if (inKeep(x, y)) continue;
+      pads.push({ x, y, r: 0.0032 + R() * 0.0038, gold: R() < 0.62 });
+      if (R() < 0.3) vias.push({ x, y, r: 0.0024 });
+    }
+    // 5) SMD-футпринты (резисторы/конденсаторы) — пара золотых падов + рефдезигнатор
+    let rc = 0;
+    for (let i = 0; i < 70; i++) {
+      const x = 0.07 + R() * 0.86, y = 0.07 + R() * 0.86;
+      if (inKeep(x, y)) continue;
+      const horiz = R() < 0.5, len = 0.013 + R() * 0.012, w = 0.006 + R() * 0.004;
+      const hx = horiz ? len * 0.5 : 0, hy = horiz ? 0 : len * 0.5;
+      pads.push({ x: x - hx, y: y - hy, gold: true, rect: true, rw: w * 1.4, rh: w * 1.4 });
+      pads.push({ x: x + hx, y: y + hy, gold: true, rect: true, rw: w * 1.4, rh: w * 1.4 });
+      comps.push({ type: 'smd', x, y, len, w, horiz });
+      silk.push({ type: 'ref', x, y: y - (horiz ? w : len * 0.5) - 0.011, text: 'R' + (++rc), size: 0.0085 });
+    }
+    // 6) QFP/BGA-микросхемы — рамка падов + контур + рефдезигнатор
+    let uc = 0;
+    for (let i = 0; i < 9; i++) {
+      const s = 0.045 + R() * 0.05, x = 0.12 + R() * 0.76, y = 0.12 + R() * 0.76;
+      if (inKeep(x, y) || Math.hypot(x - cx, y - cy) < centerKeep + s) continue;
+      comps.push({ type: 'qfp', x, y, s });
+      silk.push({ type: 'rect', x, y, s: s * 1.16 });
+      silk.push({ type: 'ref', x, y: y - s * 0.74, text: 'U' + (++uc), size: 0.011 });
+    }
+    // 7) шелкография: рамка платы + бренд-лейбл
+    silk.push({ type: 'border' });
+    silk.push({ type: 'label', x: 0.5, y: 0.945, text: 'VACANTRIX  ·  MAINBOARD  v1', size: 0.015 });
+    silk.push({ type: 'label', x: 0.5, y: 0.030, text: 'ECOSYSTEM BUS', size: 0.012 });
+    return { traces, pads, vias, silk, pours, comps, centerKeep };
+  }
+
+  // Колеровка PCB (тёмный бренд + честная медь/золото).
+  const PCB = {
+    mask:   '#0d100f', maskHi: '#141917', maskLo: '#080b0a',
+    copper: '#3a2a1c', copperHi: '#7a5630', copperEdge: '#241910',
+    gold:   '#b78f3c', goldHi: '#e9cd72', goldRim: '#5e4715',
+    silk:   '#c9c4b4', viaHole: '#05070a',
+  };
+  function strokePts(g, pts, S, lwPx, style, cap) {
+    g.lineWidth = lwPx; g.strokeStyle = style; g.lineCap = cap || 'round'; g.lineJoin = 'round';
+    g.beginPath(); g.moveTo(pts[0][0] * S, pts[0][1] * S);
+    for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0] * S, pts[i][1] * S);
+    g.stroke();
+  }
+  function drawAlbedo(S, L) {
+    const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+    g.fillStyle = PCB.mask; g.fillRect(0, 0, S, S);
+    // микро-ткань стеклотекстолита
+    g.globalAlpha = 0.05;
+    for (let i = 0; i < S; i += 6) { g.fillStyle = (i / 6 | 0) % 2 ? PCB.maskHi : PCB.maskLo; g.fillRect(i, 0, 3, S); g.fillRect(0, i, S, 3); }
+    g.globalAlpha = 1;
+    // медные полигоны-заливки с хетч-штриховкой
+    for (const p of L.pours) {
+      g.save(); g.beginPath(); g.rect(p.x * S, p.y * S, p.w * S, p.h * S); g.clip();
+      g.fillStyle = 'rgba(58,42,28,0.30)'; g.fillRect(p.x * S, p.y * S, p.w * S, p.h * S);
+      g.strokeStyle = 'rgba(122,86,48,0.16)'; g.lineWidth = 1.4;
+      for (let d = -S; d < S; d += 7) { g.beginPath(); g.moveTo(p.x * S + d, p.y * S); g.lineTo(p.x * S + d + p.h * S, (p.y + p.h) * S); g.stroke(); }
+      g.restore();
+    }
+    // трассы: тёмная медь под маской + медный блик по центру
+    for (const t of L.traces) {
+      strokePts(g, t.pts, S, t.w * S * 2.0, PCB.copperEdge);
+      strokePts(g, t.pts, S, t.w * S * 1.35, PCB.copper);
+      strokePts(g, t.pts, S, t.w * S * 0.55, 'rgba(122,86,48,' + (t.main ? 0.6 : 0.4) + ')');
+    }
+    // via-отверстия: золотое кольцо + тёмный центр
+    for (const v of L.vias) {
+      const x = v.x * S, y = v.y * S, r = v.r * S;
+      g.fillStyle = PCB.gold; g.beginPath(); g.arc(x, y, r * 1.7, 0, 7); g.fill();
+      g.fillStyle = PCB.viaHole; g.beginPath(); g.arc(x, y, r * 0.85, 0, 7); g.fill();
+    }
+    // пады ENIG-золото с бликом
+    for (const p of L.pads) {
+      const x = p.x * S, y = p.y * S;
+      if (p.rect) {
+        const w = p.rw * S, h = p.rh * S;
+        g.fillStyle = PCB.goldRim; g.fillRect(x - w * 0.62, y - h * 0.62, w * 1.24, h * 1.24);
+        const gr = g.createLinearGradient(x - w / 2, y - h / 2, x + w / 2, y + h / 2);
+        gr.addColorStop(0, PCB.goldHi); gr.addColorStop(1, PCB.gold);
+        g.fillStyle = gr; g.fillRect(x - w / 2, y - h / 2, w, h);
+      } else {
+        const r = (p.r || 0.004) * S;
+        const gr = g.createRadialGradient(x - r * 0.3, y - r * 0.3, r * 0.1, x, y, r);
+        gr.addColorStop(0, p.gold ? PCB.goldHi : '#8a6f3a'); gr.addColorStop(1, p.gold ? PCB.gold : '#6e5630');
+        g.fillStyle = p.gold ? PCB.goldRim : '#4a3a1e'; g.beginPath(); g.arc(x, y, r * 1.18, 0, 7); g.fill();
+        g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+      }
+    }
+    // SMD-корпуса (тёмные с металл-торцами) — плоская тень на albedo (3D придёт позже)
+    for (const cm of L.comps) {
+      if (cm.type === 'smd') {
+        const x = cm.x * S, y = cm.y * S, len = cm.len * S, w = cm.w * S;
+        g.fillStyle = '#1a1c20'; g.save(); g.translate(x, y); if (!cm.horiz) g.rotate(Math.PI / 2);
+        g.fillRect(-len * 0.4, -w * 0.7, len * 0.8, w * 1.4);
+        g.fillStyle = '#9a9da6'; g.fillRect(-len * 0.46, -w * 0.7, len * 0.08, w * 1.4); g.fillRect(len * 0.38, -w * 0.7, len * 0.08, w * 1.4);
+        g.restore();
+      }
+    }
+    // шелкография
+    g.fillStyle = PCB.silk; g.strokeStyle = PCB.silk; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const s of L.silk) {
+      g.globalAlpha = 0.5;
+      if (s.type === 'border') { g.globalAlpha = 0.35; g.lineWidth = 3; g.strokeRect(S * 0.018, S * 0.018, S * 0.964, S * 0.964); }
+      else if (s.type === 'rect') { g.globalAlpha = 0.4; g.lineWidth = 2; g.strokeRect((s.x - s.s / 2) * S, (s.y - s.s / 2) * S, s.s * S, s.s * S); }
+      else if (s.type === 'ref') { g.globalAlpha = 0.55; g.font = (s.size * S) + 'px monospace'; g.fillText(s.text, s.x * S, s.y * S); }
+      else if (s.type === 'label') { g.globalAlpha = 0.5; g.font = '600 ' + (s.size * S) + 'px monospace'; g.fillText(s.text, s.x * S, s.y * S); }
+    }
+    g.globalAlpha = 1;
+    return c;
+  }
+  // height-канва: маска=средне, медь/пады/шелк выше, via ниже → потом в normal.
+  function drawHeight(S, L) {
+    const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+    g.fillStyle = '#777'; g.fillRect(0, 0, S, S);
+    for (const t of L.traces) { strokePts(g, t.pts, S, t.w * S * 1.35, '#9a9a9a'); strokePts(g, t.pts, S, t.w * S * 0.55, '#b6b6b6'); }
+    for (const p of L.pads) { const x = p.x * S, y = p.y * S; g.fillStyle = '#c8c8c8'; if (p.rect) { g.fillRect(x - p.rw * S / 2, y - p.rh * S / 2, p.rw * S, p.rh * S); } else { g.beginPath(); g.arc(x, y, (p.r || 0.004) * S, 0, 7); g.fill(); } }
+    for (const v of L.vias) { g.fillStyle = '#bbb'; g.beginPath(); g.arc(v.x * S, v.y * S, v.r * S * 1.7, 0, 7); g.fill(); g.fillStyle = '#3a3a3a'; g.beginPath(); g.arc(v.x * S, v.y * S, v.r * S * 0.85, 0, 7); g.fill(); }
+    g.fillStyle = '#e6e6e6'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    for (const s of L.silk) { if (s.type === 'ref' || s.type === 'label') { g.font = (s.size * S) + 'px monospace'; g.fillText(s.text, s.x * S, s.y * S); } }
+    return c;
+  }
+  function heightToNormal(hc, strength) {
+    const w = hc.width, h = hc.height; const src = hc.getContext('2d').getImageData(0, 0, w, h).data;
+    const out = document.createElement('canvas'); out.width = w; out.height = h; const og = out.getContext('2d');
+    const img = og.createImageData(w, h), d = img.data;
+    const at = (x, y) => src[((y < 0 ? 0 : y >= h ? h - 1 : y) * w + (x < 0 ? 0 : x >= w ? w - 1 : x)) * 4];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      let nx = (at(x - 1, y) - at(x + 1, y)) / 255 * strength, ny = (at(x, y + 1) - at(x, y - 1)) / 255 * strength, nz = 1;
+      const inv = 1 / Math.hypot(nx, ny, nz); nx *= inv; ny *= inv; nz *= inv;
+      const i = (y * w + x) * 4; d[i] = (nx * 0.5 + 0.5) * 255; d[i + 1] = (ny * 0.5 + 0.5) * 255; d[i + 2] = (nz * 0.5 + 0.5) * 255; d[i + 3] = 255;
+    }
+    og.putImageData(img, 0, 0); return out;
+  }
+  // roughness: маска матовая, медь/золото глянцевее. metalness: медь/золото = металл.
+  function drawMaterial(S, L, kind) {
+    const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+    g.fillStyle = kind === 'rough' ? '#cccccc' : '#000000'; g.fillRect(0, 0, S, S);   // rough: матовая маска ; metal: диэлектрик
+    const copper = kind === 'rough' ? '#666666' : '#e6e6e6';                // медь: глянцевее + металл
+    const gold = kind === 'rough' ? '#444444' : '#ffffff';                  // золото: ещё глянцевее + металл
+    for (const t of L.traces) strokePts(g, t.pts, S, t.w * S * 1.5, copper);
+    for (const v of L.vias) { g.fillStyle = gold; g.beginPath(); g.arc(v.x * S, v.y * S, v.r * S * 1.7, 0, 7); g.fill(); }
+    for (const p of L.pads) { const x = p.x * S, y = p.y * S; g.fillStyle = gold; if (p.rect) g.fillRect(x - p.rw * S / 2, y - p.rh * S / 2, p.rw * S, p.rh * S); else { g.beginPath(); g.arc(x, y, (p.r || 0.004) * S, 0, 7); g.fill(); } }
+    return c;
+  }
+  function makeBoardTextures(L) {
+    const AS = LOWQ ? 1024 : 2048, NS = LOWQ ? 512 : 1024;
+    const mk = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t; };
+    const emisC = document.createElement('canvas'); emisC.width = emisC.height = 8; emisC.getContext('2d').fillStyle = '#000'; emisC.getContext('2d').fillRect(0, 0, 8, 8);
+    return {
+      map:    mk(drawAlbedo(AS, L), true),
+      normal: LOWQ ? null : mk(heightToNormal(drawHeight(NS, L), 2.4), false),   // normal-map дорого → off на слабых
+      rough:  mk(drawMaterial(NS, L, 'rough'), false),
+      metal:  mk(drawMaterial(NS, L, 'metal'), false),
+      emis:   mk(emisC, true),
+    };
+  }
+
+  // ── Геометрия платы — почти TOP-DOWN (вид сверху, макро), лёгкий наклон ──
+  const BOARD_TILT = 1.30;                             // ~74° — плата «смотрит» в камеру; остаточный угол = параллакс
   const boardQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(BOARD_TILT, 0, 0));
   const _bw = new THREE.Vector3();                     // временный (layout): board-local → world-local
   const _bn = new THREE.Vector3();                     // нормаль платы (world)
   // board-плоскость (u=гориз, v=глубина, h=высота над платой) → world-локаль (наклон вшит).
   function boardToWorld(u, v, h, out) { (out || _bw).set(u, h, v).applyQuaternion(boardQuat); return out || _bw; }
 
-  const boardTex = makeBoardTextures();
+  const boardLayout = generatePCBLayout();
+  const boardTex = makeBoardTextures(boardLayout);
   const boardMat = new THREE.MeshStandardMaterial({
-    map: boardTex.map, emissiveMap: boardTex.emis, emissive: 0xffffff, emissiveIntensity: 0.6,
-    roughness: 0.62, metalness: 0.28,
+    map: boardTex.map, normalMap: boardTex.normal, roughnessMap: boardTex.rough, metalnessMap: boardTex.metal,
+    roughness: 1.0, metalness: 1.0,                    // финальные значения модулируются картами
+    emissiveMap: boardTex.emis, emissive: 0xffffff, emissiveIntensity: 0.0,   // красного в базе НЕТ (ток придёт шейдером)
+    envMapIntensity: 0.85,
   });
+  boardMat.normalScale = new THREE.Vector2(0.7, 0.7);
+
+  // ── Ток ПО САМИМ медным дорожкам платы (emissive-инъекция в boardMat) ──
+  // Маска трасс (канал G) → красные пакеты бегут радиально от CPU наружу,
+  // идеально совпадая с медью (та же uv). Сюда же вшит клик-разряд (волна).
+  function makeFlowMask(S, L) {
+    const c = document.createElement('canvas'); c.width = c.height = S; const g = c.getContext('2d');
+    g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
+    for (const t of L.traces) strokePts(g, t.pts, S, t.w * S * 1.7, t.main ? '#00ff00' : '#009100');
+    // пады в маску НЕ кладём — ток не должен светить золото (bloom-пересвет)
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.NoColorSpace; tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.anisotropy = MAX_ANISO;
+    return tex;
+  }
+  const flowMask = makeFlowMask(LOWQ ? 512 : 1024, boardLayout);
+  const boardFlow = {
+    uTime:  { value: 0 },
+    uMask:  { value: flowMask },
+    uColor: { value: new THREE.Color(ACCENT) },
+    uHot:   { value: new THREE.Color(0xff3b46) },              // глубокий красный (не розовый)
+    uDisc:  { value: new THREE.Vector4(0.5, 0.5, -100, 0) },   // x,y = uv-источник; z = t0; w = сила
+  };
+  boardMat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, boardFlow);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vBoardUv;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBoardUv = uv;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vBoardUv;\nuniform float uTime;\nuniform sampler2D uMask;\nuniform vec3 uColor,uHot;\nuniform vec4 uDisc;')
+      .replace('#include <emissivemap_fragment>', [
+        '#include <emissivemap_fragment>',
+        '{',
+        '  float mask = texture2D(uMask, vBoardUv).g;',
+        '  float d = distance(vBoardUv, vec2(0.5));',
+        '  float ph = fract(d*9.0 - uTime*0.5);',                           // пакеты радиально от центра (CPU)
+        '  float pulse = smoothstep(0.05,0.0,ph) + smoothstep(0.19,0.05,ph)*0.26;', // острый фронт + короткий хвост, длинный тёмный зазор
+        '  vec3 flow = mix(uColor,uHot,pulse)*pulse*mask*0.95;',
+        '  float age = uTime - uDisc.z;',                                    // клик-разряд: фронт волны по дорожкам
+        '  if (age > 0.0 && age < 2.4) {',
+        '    float dd = distance(vBoardUv, uDisc.xy);',
+        '    float front = age*0.85;',
+        '    float band = exp(-pow((dd-front)/0.055, 2.0));',
+        '    float fade = exp(-age*1.3);',
+        '    flow += uHot * band * fade * (0.5 + mask*1.9) * uDisc.w;',
+        '  }',
+        '  totalEmissiveRadiance += flow;',
+        '}',
+      ].join('\n'));
+    boardMat.userData.sh = sh;
+  };
+  boardMat.needsUpdate = true;
   const BOARD_BASE = 12;                               // базовый размер плиты (масштабируется на layout)
   const board = new THREE.Mesh(new THREE.BoxGeometry(BOARD_BASE, 0.22, BOARD_BASE), boardMat);
   board.quaternion.copy(boardQuat);
   world.add(board);
+
+  // ── Детали корпусов: золотые выводы-ножки (QFP) + матовая подложка ────────
+  const leadMat = new THREE.MeshStandardMaterial({ color: 0xc9a95c, metalness: 0.95, roughness: 0.32, envMapIntensity: 1.1 });
+  const leadGeo = new THREE.BoxGeometry(0.07, 0.035, 0.18);     // ножка: длина вдоль Z, выходит из корпуса
+  const _qx90 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2);
+  const _qI = new THREE.Quaternion(), _sI = new THREE.Vector3(1, 1, 1), _mI = new THREE.Matrix4(), _pI = new THREE.Vector3();
+  function addLeads(parent, hw, hd, y, perSide) {
+    const im = new THREE.InstancedMesh(leadGeo, leadMat, perSide * 4);
+    im.frustumCulled = false; let idx = 0;
+    for (let i = 0; i < perSide; i++) {
+      const t = (i + 0.5) / perSide * 2 - 1;
+      _pI.set(t * hw * 0.84, y, hd + 0.085);  _mI.compose(_pI, _qI, _sI);   im.setMatrixAt(idx++, _mI);  // низ
+      _pI.set(t * hw * 0.84, y, -hd - 0.085); _mI.compose(_pI, _qI, _sI);   im.setMatrixAt(idx++, _mI);  // верх
+      _pI.set(hw + 0.085, y, t * hd * 0.84);  _mI.compose(_pI, _qx90, _sI); im.setMatrixAt(idx++, _mI);  // право
+      _pI.set(-hw - 0.085, y, t * hd * 0.84); _mI.compose(_pI, _qx90, _sI); im.setMatrixAt(idx++, _mI);  // лево
+    }
+    im.instanceMatrix.needsUpdate = true; parent.add(im); return im;
+  }
+  const underTex = (function () {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    const grd = g.createRadialGradient(64, 64, 6, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(255,255,255,1)'); grd.addColorStop(0.5, 'rgba(255,255,255,0.74)'); grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  function makeUnderlay(size) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size),
+      new THREE.MeshBasicMaterial({ map: underTex, color: 0x000000, transparent: true, opacity: 0.7, depthWrite: false }));
+    m.rotation.x = -Math.PI / 2; return m;
+  }
+  const SHADOW_OFF = { x: -0.2, z: -0.16 };             // направление псевдо-тени (противоположно keyLight)
 
   // ── CPU-ЯДРО (Vacantrix Platform, coreEntry) — ступенчатый чип в центре ──
   const CPU_W = 2.3, CPU_R = 1.25;                     // ширина CPU / радиус выхода дорожек
@@ -334,6 +587,8 @@ export function start(opts) {
   cpuCap.add(coreSeams); coreSeams.visible = false;
   const coreHalo = glowSprite(ACCENT, 3.4, 0);
   coreHalo.position.y = 1.0; coreGroup.add(coreHalo);
+  const cpuUnder = makeUnderlay(CPU_W * 1.9); cpuUnder.position.set(SHADOW_OFF.x * 1.4, 0.018, SHADOW_OFF.z * 1.4); coreGroup.add(cpuUnder);   // заземление + псевдо-тень
+  addLeads(coreGroup, CPU_W * 0.5, CPU_W * 0.5, 0.07, 10);                                            // золотые ножки QFP
 
   // ── Чипы-инструменты (nodes) ──────────────────────────────────────────
   // Раскладка [nx, ny] — позиция чипа на ПЛОСКОСТИ платы (−1..1), как угол вокруг
@@ -351,7 +606,37 @@ export function start(opts) {
   const BOARD_FIT = 0.72;                              // плотность чипов вокруг CPU (доля рамки сцены)
   const STAGE_MIN = 0.72, STAGE_MAX = 1.85;
   const CHIP_W = 1.5, CHIP_D = 1.2, CHIP_H = 0.42, CHIP_R = 0.8;   // габариты чипа / радиус входа дорожки
-  const TRACE_H = 0.07, TRACE_W = 0.13, TRACE_PITCH = 1.1;        // дорожка над платой / ширина / шаг тока
+  const TRACE_H = 0.085, TRACE_W = 0.16, TRACE_PITCH = 0.85;      // дорожка над платой / ширина / шаг тока
+
+  // ── Шейдер бегущего тока: красные направленные импульсы (кометный хвост) ──
+  // База почти невидима (медь платы видна), за bloom-порог выходят только пакеты.
+  function makeFlowMat() {
+    return new THREE.ShaderMaterial({
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 }, uOpacity: { value: 0 }, uSpeed: { value: 0.62 },
+        uColor: { value: new THREE.Color(ACCENT) }, uHot: { value: new THREE.Color(0xff3b46) },
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+      fragmentShader: [
+        'precision highp float;',
+        'uniform float uTime,uOpacity,uSpeed; uniform vec3 uColor,uHot; varying vec2 vUv;',
+        'void main(){',
+        '  float across=abs(vUv.x-0.5)*2.0;',
+        '  float prof=smoothstep(1.0,0.12,across);',          // яркий центр ленты, мягкие края
+        '  float s=vUv.y-uTime*uSpeed;',                       // пакеты бегут наружу (CPU→чип)
+        '  float f=fract(s);',
+        '  float lead=smoothstep(0.12,0.0,f);',                // резкий передний фронт
+        '  float tail=smoothstep(0.0,0.4,f)*(1.0-f);',         // короткий кометный хвост
+        '  float packet=clamp(lead+tail*0.4,0.0,1.0);',
+        '  float rail=0.04;',                                  // едва тлеющий рельс (медь видна)
+        '  vec3 col=mix(uColor,uHot,packet)*(rail+packet*2.0)*prof;',
+        '  float a=(rail*0.6+packet)*prof*uOpacity;',
+        '  gl_FragColor=vec4(col,a);',
+        '}',
+      ].join('\n'),
+    });
+  }
 
   const tmp = new THREE.Vector3();
   const nodes = KEYS.map((key, i) => {
@@ -361,10 +646,14 @@ export function start(opts) {
     const grp = new THREE.Group();
     grp.quaternion.copy(boardQuat);                    // чип стоит вдоль нормали наклонённой платы
     const body = new THREE.Mesh(new THREE.BoxGeometry(CHIP_W, CHIP_H, CHIP_D),
-      new THREE.MeshStandardMaterial({ color: 0x15171d, metalness: 0.55, roughness: 0.48,
-        envMapIntensity: 1.0, emissive: color, emissiveIntensity: 0.22 }));   // рамка светится цветом бренда
+      new THREE.MeshStandardMaterial({ color: 0x0d0e11, metalness: 0.22, roughness: 0.7,
+        envMapIntensity: 0.85, emissive: color, emissiveIntensity: 0.06 }));   // матовый эпокси-корпус, бренд лишь намёком
     grp.add(body);
     const mesh = body;                                 // пикабельный меш
+    // светящаяся бренд-фаска по рёбрам корпуса — чип читается как реальный, но брендирован
+    const seam = new THREE.LineSegments(new THREE.EdgesGeometry(body.geometry),
+      new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false }));
+    body.add(seam);
     const iconTex = iconTexture(ICON[key]);
     const top = new THREE.Mesh(new THREE.PlaneGeometry(CHIP_W * 0.78, CHIP_D * 0.78),
       new THREE.MeshBasicMaterial({ map: iconTex, transparent: true }));
@@ -373,14 +662,14 @@ export function start(opts) {
     world.add(grp);
 
     // мягкое свечение слота в цвете бренда (рамка)
-    const halo = glowSprite(color, 2.4, 0);
+    const halo = glowSprite(color, 1.95, 0);
     halo.position.y = CHIP_H * 0.2; grp.add(halo);
+    // реалистичные детали: матовая подложка + золотые выводы-ножки
+    const under = makeUnderlay(Math.max(CHIP_W, CHIP_D) * 1.7); under.position.set(SHADOW_OFF.x, -CHIP_H * 0.5 + 0.012, SHADOW_OFF.z); grp.add(under);
+    addLeads(grp, CHIP_W * 0.5, CHIP_D * 0.5, -CHIP_H * 0.5 + 0.05, 7);
 
-    // дорожка-трейс к CPU (бегущий ток) — геометрия строится в updateTraces()
-    const traceMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
-      map: energyTex, transparent: true, opacity: 0, depthWrite: false,
-      side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
-    }));
+    // дорожка-трейс к CPU (бегущий ток, шейдер) — геометрия строится в updateTraces()
+    const traceMesh = new THREE.Mesh(new THREE.BufferGeometry(), makeFlowMat());
     traceMesh.visible = false; world.add(traceMesh);
 
     // интро-импульс «искра из CPU к чипу»
@@ -481,23 +770,76 @@ export function start(opts) {
   selRing.visible = false;
   scene.add(selRing);
 
+  // ── Клик по пустоте → РАЗРЯД: волна красного тока + ударные кольца ─────
+  // Волна по дорожкам делает boardMat (uDisc). Здесь — кольца на плоскости
+  // платы + краткий буст bloom. fxGroup повторяет наклон платы (плоскость XZ).
+  const BLOOM_BASE = 0.8;
+  const fxGroup = new THREE.Group(); fxGroup.quaternion.copy(boardQuat); world.add(fxGroup);
+  const _ndc = new THREE.Vector2(), _ray = new THREE.Raycaster(), _wl = new THREE.Vector3();
+  const ringTex = (function () {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    const grd = g.createRadialGradient(64, 64, 30, 64, 64, 64);
+    grd.addColorStop(0, 'rgba(0,0,0,0)'); grd.addColorStop(0.74, accRGBA(0)); grd.addColorStop(0.86, accRGBA(1));
+    grd.addColorStop(0.94, 'rgba(255,180,188,1)'); grd.addColorStop(1, accRGBA(0));
+    g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const rings = [];
+  for (let i = 0; i < 3; i++) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, opacity: 0, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2; m.visible = false; m.renderOrder = 990; fxGroup.add(m);
+    rings.push({ m, age: 1e3, life: 0.85, max: 1 });
+  }
+  let ringIdx = 0, dischargeFlash = 0, nowSec = 0;
+  function spawnRing(worldPt, scaleMax) {
+    const r = rings[ringIdx]; ringIdx = (ringIdx + 1) % rings.length;
+    fxGroup.worldToLocal(_wl.copy(worldPt));
+    r.m.position.set(_wl.x, Math.max(_wl.y, 0.05) + 0.04, _wl.z);
+    r.age = 0; r.max = scaleMax || 7; r.m.visible = true; r.m.material.opacity = 0;
+  }
+  function triggerDischarge(px, py) {
+    _ndc.set((px / window.innerWidth) * 2 - 1, -(py / window.innerHeight) * 2 + 1);
+    _ray.setFromCamera(_ndc, camera);
+    const hit = _ray.intersectObject(board, false)[0];
+    if (!hit || !hit.uv) return;
+    boardFlow.uDisc.value.set(hit.uv.x, hit.uv.y, nowSec, 1.0);   // волна тока от точки клика
+    dischargeFlash = 1.0;
+    spawnRing(hit.point, 8.5);
+    spawnRing(hit.point, 5.0);
+  }
+  function updateDischarge(dt) {
+    for (const r of rings) {
+      if (!r.m.visible) continue;
+      r.age += dt;
+      const k = clamp01(r.age / r.life);
+      const s = 0.4 + r.max * ease(k);
+      r.m.scale.set(s, s, s);
+      r.m.material.opacity = (1 - k) * 0.9;
+      if (k >= 1) { r.m.visible = false; }
+    }
+    dischargeFlash *= Math.pow(0.5, dt / 0.45);
+    bloomPass.strength = BLOOM_BASE + dischargeFlash * 0.55;
+  }
+
   // ── Кадрирование камеры ───────────────────────────────────────────────
   let baseDist = 14;
   function fitDistance() {
     const aspect = window.innerWidth / Math.max(1, window.innerHeight);
     const vFov = camera.fov * Math.PI / 180;
     const t = clampv((aspect - 0.55) / (2.0 - 0.55), 0, 1);
-    const R = lerp(4.4, 6.2, t);                          // портрет — ближе (крупнее), широкий — дальше
+    const R = lerp(5.6, 7.3, t);                          // top-down: плата шире в кадре → отъезжаем дальше
     const dV = R / (Math.tan(vFov / 2) * 0.9);
     const dH = R / (Math.tan(vFov / 2) * aspect * 0.9);
-    return Math.max(dV, dH);
+    const d = Math.max(dV, dH);
+    return aspect < 0.8 ? d * 0.8 : d;                    // портрет: ближе, плата заполняет кадр
   }
   function onResize() {
     const w = window.innerWidth, h = window.innerHeight;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOWQ ? 1.5 : 2));
     renderer.setSize(w, h);
     composer.setSize(w, h);
-    bloomPass.setSize(w, h);
+    bloomPass.setSize(Math.max(2, w * 0.5), Math.max(2, h * 0.5));   // half-res bloom: ÷4 fill-стоимости, мягкий блюр незаметен
     camera.aspect = w / h; camera.updateProjectionMatrix();
     baseDist = fitDistance();
     layoutHomes();
@@ -638,6 +980,8 @@ export function start(opts) {
       if (picked === coreEntry) { coreSel = true; }    // CPU: без зума, продукты гаснут + рамка ядра пульсирует
       else { focusTarget = picked; coreSel = false; }  // чип: зум + подсветка
       if (window.AppDetail && window.AppDetail.open) window.AppDetail.open(picked.key);
+    } else {
+      triggerDischarge(e.clientX, e.clientY);           // пустой участок → разряд (без открытия раздела)
     }
   }
 
@@ -792,6 +1136,7 @@ export function start(opts) {
       n.home.lerp(n.target, Math.min(1, dt * 2.6));
       const p = tmp.copy(n.home);
       n.grp.position.copy(p);                            // позиция; ориентация=boardQuat (задана на build)
+      n.traceMesh.material.uniforms.uTime.value = tsec;  // бег тока в шейдере (направленные пакеты)
 
       if (phase === 'intro') {
         const tStart = FIRST + i * STAGGER;
@@ -812,19 +1157,22 @@ export function start(opts) {
         const grow = clamp01((t - (tStart + PULSE_DUR - 120)) / 360);
         const g = ease(grow);
         n.grp.scale.setScalar(g);
-        n.traceMesh.visible = g > 0.004; if (n.traceMesh.visible) n.traceMesh.material.opacity = g;
-        n.halo.material.opacity = g * 0.6;
+        n.traceMesh.visible = g > 0.004; if (n.traceMesh.visible) n.traceMesh.material.uniforms.uOpacity.value = g;
+        n.halo.material.opacity = g * 0.45;
       } else {
         const vis = (focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim);
         n.grp.scale.setScalar(vis);
         const tv = vis * (1 - fp);
-        n.traceMesh.visible = tv > 0.004; if (n.traceMesh.visible) n.traceMesh.material.opacity = tv;
-        n.halo.material.opacity = 0.5 * vis;
+        n.traceMesh.visible = tv > 0.004; if (n.traceMesh.visible) n.traceMesh.material.uniforms.uOpacity.value = tv;
+        n.halo.material.opacity = 0.42 * vis;
         n.line.material.opacity = 0;
       }
     }
 
-    energyTex.offset.y = (energyTex.offset.y - dt * 0.5) % 1;   // бег тока по дорожкам наружу
+    // Ток по самим дорожкам платы + клик-разряд (волна + кольца + bloom).
+    nowSec = tsec;
+    boardFlow.uTime.value = tsec;
+    updateDischarge(dt);
 
     // 3D-кольцо выделения: в центр наведённого чипа, лицом к камере (pick-радиус).
     if (hovered && phase === 'idle') {
@@ -921,7 +1269,8 @@ export function start(opts) {
       });
     } catch (e) {}
     if (scene.environment) texSet.add(scene.environment);
-    [glowTex, energyTex, boardTex.map, boardTex.emis].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
+    [glowTex, boardTex.map, boardTex.emis, boardTex.normal, boardTex.rough, boardTex.metal,
+     flowMask, ringTex, underTex].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
     texSet.forEach((t) => { try { if (t.dispose) t.dispose(); } catch (e) {} });
     try { if (composer.dispose) composer.dispose(); } catch (e) {}
     try { pmrem.dispose(); } catch (e) {}
