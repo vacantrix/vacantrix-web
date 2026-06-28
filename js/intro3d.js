@@ -491,14 +491,16 @@ export function start(opts) {
   coreGroup.add(makeAtmosphere(1.6, ACCENT));            // back-lit лимб ядра (следует за пульсом coreGroup)
 
   const rings = [];
-  // орбиты под общим наклоном (плоскость, согласованная с наклоном ядра) → видны как эллипсы
-  [[0x4fd0ff, 3.3, 0.05, 0.13], [0x9b6bff, 4.3, -0.04, 0.10], [0x57d1ff, 5.2, 0.08, 0.075]]
-    .forEach(([col, r, vary, op]) => {
+  // Орбитальные плоскости («оси» системы) перестроены реалистично: РАЗНЫЕ наклоны и
+  // радиусы, как у настоящих орбит, а не почти-копланарные. [color, radius, rotX, rotZ, opacity].
+  [[0x4fd0ff, 2.8, 1.18, 0.10, 0.16], [0x9b6bff, 3.7, 1.34, -0.24, 0.12],
+   [0x57d1ff, 4.7, 1.01, 0.30, 0.09], [0xff6ab0, 5.7, 1.46, 0.06, 0.06]]
+    .forEach(([col, r, rx, rz, op]) => {
       const ring = new THREE.Mesh(
-        new THREE.TorusGeometry(r, 0.012, 8, 200),
+        new THREE.TorusGeometry(r, 0.011, 8, 220),
         new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op })
       );
-      ring.rotation.x = Math.PI / 2 - 0.42 + vary; ring.rotation.z = 0.2 + vary;
+      ring.rotation.x = rx; ring.rotation.z = rz;
       world.add(ring); rings.push(ring);
     });
 
@@ -510,23 +512,33 @@ export function start(opts) {
   // передний вид узнаваем) + ВЫРАЖЕННАЯ глубина по Z (нормир. −1..1, ×DEPTH).
   // Глубина чередуется вперёд/назад → при вращении сцена читается ОБЪЁМНО (3D-орб),
   // а не плоским кольцом. nz знак: + к камере (ближе/крупнее), − вглубь.
+  // Несимметричный 3D-разброс (раскидано по разным координатам, без зеркальных пар):
+  // у каждой планеты свой угол/радиус на экране И выраженная разная глубина nz → читается
+  // как настоящая 3D-система, а не плоское кольцо. [nx, ny, nz(−вглубь / +к камере)].
   const LAYOUT = {
-    hh:        [ 0.00,  0.82,  0.55],
-    avito:     [ 0.80,  0.42, -0.80],
-    tasks:     [-0.80,  0.42,  0.68],
-    publisher: [ 0.84, -0.34, -0.95],
-    leads:     [-0.84, -0.34,  0.72],
-    monitor:   [ 0.44, -0.84,  0.40],
-    analytics: [-0.44, -0.84, -0.62],
+    hh:        [ 0.31,  0.86,  0.35],
+    avito:     [ 0.90,  0.29, -0.72],
+    tasks:     [-0.67,  0.57,  0.84],
+    publisher: [-0.85, -0.31, -0.50],
+    leads:     [-0.20, -0.79,  0.60],
+    monitor:   [ 0.61, -0.73,  0.16],
+    analytics: [ 0.66, -0.15, -0.92],
   };
   const SPREAD = 0.74;                                 // доля полуэкрана (поджат — запас под глубину, чтобы передние не клипались)
-  const DEPTH  = 3.2;                                  // масштаб глубины Z (тунабельно: больше → объёмнее, риск клипа передних)
+  const DEPTH  = 3.6;                                  // масштаб глубины Z (увеличен → выраженный 3D-разброс)
+  // Реалистичные оси: у каждой планеты СВОЙ осевой наклон [x-наклон, z-крен] (как Земля 23°,
+  // Уран ~98° → leads, почти прямая ось → avito) + индивидуальный размер. Не паттерн i%N.
+  const AXIAL = {
+    hh: [0.41, 0.10], avito: [0.05, -0.04], tasks: [0.92, 0.28], publisher: [0.47, -0.20],
+    leads: [1.55, 0.16], monitor: [0.22, -0.12], analytics: [0.64, 0.24],
+  };
+  const PRADIUS = { hh: 1.02, avito: 0.90, tasks: 0.84, publisher: 0.88, leads: 1.00, monitor: 0.86, analytics: 0.96 };
   const STAGE_MIN = 0.72, STAGE_MAX = 1.85;            // ограничение соотношения «сцены» (центрируем созвездие)
 
   const tmp = new THREE.Vector3();
   const nodes = KEYS.map((key, i) => {
     const color = NODE_COLORS[key];
-    const pradius = 0.86 + (i % 3) * 0.10;             // размер планеты (чуть уменьшено)
+    const pradius = PRADIUS[key];                      // индивидуальный размер планеты
     const spin    = 0.22 + (i % 4) * 0.08;             // самовращение
     const nx = LAYOUT[key][0], ny = LAYOUT[key][1];
     const nz = LAYOUT[key][2];                          // нормир. глубина (−1..1), масштабируется DEPTH в layoutHomes
@@ -540,7 +552,7 @@ export function start(opts) {
     const core = mesh;                                  // ядро вращения = сама планета
     // осевой наклон (как у реальных планет), у каждой свой угол → вращение вокруг наклонённой оси
     const tilt = new THREE.Group();
-    tilt.rotation.set(0.18 + (i % 3) * 0.13, 0, (i % 2 ? 1 : -1) * (0.16 + (i % 4) * 0.1));
+    tilt.rotation.set(AXIAL[key][0], 0, AXIAL[key][1]);  // реалистичный осевой наклон планеты
     tilt.add(mesh); grp.add(tilt);
     const seams = makeSeams(pradius * 1.015);
     mesh.add(seams);                                    // ребёнок планеты → крутится с гранями
@@ -833,6 +845,7 @@ export function start(opts) {
   let _safety = 0;                     // id таймера-страховки интро
   const _listeners = [];               // [target, type, fn, opts] — снять в pause/dispose
   let focus = 0, focusTarget = null, focusEntry = null, focusRef = null;
+  let coreSel = false, coreDim = 0;    // Platform выбран (без зума): продукты гаснут, швы ядра пульсируют
   // focusEntry — гейт ВЗАИМОДЕЙСТВИЯ (сбрасывается рано, чтобы вернуть управление);
   // focusRef — ВИЗУАЛЬНАЯ ссылка, держится до полного возврата камеры (fp≈0), без рывка в конце.
   let focusGoal = 0, focusFrom = 0, focusElapsed = 0;   // твин focus по ТАЙМЕРУ (конечная длительность)
@@ -868,8 +881,9 @@ export function start(opts) {
     if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
     const picked = pickAt(e.clientX, e.clientY);
     if (picked) {
-      appView = true;                                  // панель открыта (вкл. лёгкий фон у Platform)
-      if (picked !== coreEntry) focusTarget = picked;  // зум+пульс — у продуктов; у ядра НЕТ приближения
+      appView = true;                                  // панель открыта
+      if (picked === coreEntry) { coreSel = true; }    // ядро: без зума, но продукты гаснут + швы пульсируют
+      else { focusTarget = picked; coreSel = false; }  // продукт: зум + пульс («как было»)
       if (window.AppDetail && window.AppDetail.open) window.AppDetail.open(picked.key);
     }
   }
@@ -1021,7 +1035,7 @@ export function start(opts) {
     const ig = phase === 'intro' ? ease(clamp01((t - 150) / IGNITE)) : 1;
     const beat = Math.sin(tsec * 1.7);
     const coreFocusK = (focusRef && focusRef !== coreEntry) ? Math.max(0, 1 - fp) : 1;
-    coreGroup.scale.setScalar((0.4 + 0.6 * ig) * (1 + beat * 0.05) * coreFocusK);
+    coreGroup.scale.setScalar((0.4 + 0.6 * ig) * (1 + beat * 0.05) * coreFocusK * (1 + coreDim * 0.12));
     coreInner.material.emissiveIntensity = ig * (0.75 + beat * 0.18);
     coreInner.rotation.y += dt * 0.25;
     coreHalo.material.opacity = ig * (0.6 + beat * 0.1);
@@ -1029,8 +1043,9 @@ export function start(opts) {
     coreHalo.scale.setScalar(15 * (0.92 + 0.08 * beat) * (0.5 + 0.5 * ig));
     corePoint.intensity = ig * 2.6;
     rings.forEach((r, i) => { r.rotation.z += dt * (0.05 + i * 0.018); });
-    { const m = coreSeams.material;                      // швы ядра — при фокусе на Vacantrix
-      const tgt = (focusEntry === coreEntry) ? (0.5 + 0.5 * Math.sin(tsec * 4.5)) : 0;
+    coreDim += ((coreSel ? 1 : 0) - coreDim) * Math.min(1, dt * 5);   // Platform выбран → продукты гаснут
+    { const m = coreSeams.material;                      // швы ядра пульсируют при фокусе ИЛИ выборе Platform
+      const tgt = (focusEntry === coreEntry || coreSel) ? (0.5 + 0.5 * Math.sin(tsec * 4.5)) : 0;
       m.opacity += (tgt - m.opacity) * Math.min(1, dt * 7); coreSeams.visible = m.opacity > 0.01; }
 
     if (phase === 'intro' && t > 950 && veil) veil.classList.add('lift');
@@ -1073,12 +1088,12 @@ export function start(opts) {
         n.grp.scale.setScalar(ease(grow));
         n.halo.material.opacity = ease(grow) * 0.85;
       } else {
-        n.grp.scale.setScalar(focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1);
+        n.grp.scale.setScalar((focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim));
         n.halo.material.opacity = 0.58 + 0.06 * Math.sin(tsec * 0.6 + i);   // лёгкое «дыхание»
         n.halo.material.rotation += dt * (0.035 + (i % 3) * 0.012);          // медленное вращение облака
 
         // Обычная простая линия, связывающая ядро и планету.
-        n.line.material.opacity = 0.16 * (1 - fp);          // плавно гаснет при наезде / проявляется при возврате (без рывка)
+        n.line.material.opacity = 0.16 * (1 - fp) * (1 - coreDim);   // гаснет при наезде/возврате и при выборе Platform
         const lp = n.line.geometry.attributes.position.array;
         lp[0] = 0; lp[1] = 0; lp[2] = 0; lp[3] = p.x; lp[4] = p.y; lp[5] = p.z;
         n.line.geometry.attributes.position.needsUpdate = true;
@@ -1117,8 +1132,7 @@ export function start(opts) {
       if (selRing.material.opacity <= 0.02) selRing.visible = false;
     }
 
-    if (appView && !focusRef) renderer.render(scene, camera);   // карточка Platform (панель без фокуса) → дёшево, без bloom
-    else composer.render();
+    composer.render();
 
     // Карточка следует за планетой (после render — матрицы свежие).
     if (hovered && phase === 'idle') positionCard(hovered);
@@ -1141,11 +1155,10 @@ export function start(opts) {
   function onHashView() {
     const m = (location.hash || '').match(/^#app\/(.+)$/);
     appView = !!m;
-    if (!m) { focusTarget = null; return; }             // ушли из раздела → камера домой
-    if (!focusTarget) {                                  // прямой заход по ссылке (без клика)
-      let key; try { key = decodeURIComponent(m[1]); } catch (e) { key = m[1]; }
-      if (key !== 'platform') focusTarget = hoverables.find(h => h.key === key) || null;  // ядро — без зума
-    }
+    if (!m) { focusTarget = null; coreSel = false; return; }   // ушли из раздела → всё домой
+    let key; try { key = decodeURIComponent(m[1]); } catch (e) { key = m[1]; }
+    if (key === 'platform') { coreSel = true; }                 // ядро — без зума, со своей анимацией
+    else if (!focusTarget) { focusTarget = hoverables.find(h => h.key === key) || null; coreSel = false; }
   }
 
   // ── Подцепка/снятие ВСЕХ слушателей (pause/resume/dispose) ─────────────
