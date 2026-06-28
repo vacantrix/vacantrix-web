@@ -493,7 +493,6 @@ export function start(opts) {
   // ── Энерго-трубы ядро→планета: металлический кожух со стеклянными окнами, сквозь ──
   //    которые видно бегущую внутри КРАСНУЮ энергию. Текстуры общие на все трубы.
   const tubeR = 0.06;
-  const _yAxis = new THREE.Vector3(0, 1, 0), _td = new THREE.Vector3();
   // Поток энергии: почти чёрно-красная база + бегущие яркие импульсы (анимируем offset.y).
   const energyTex = (function () {
     const W = 8, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
@@ -520,27 +519,33 @@ export function start(opts) {
     return t;
   })();
 
-  // ── Хардвер труб: гильза-стекло, муфты/фланцы, коннекторы-раструбы + ОПОРЫ ──
-  //    (несущая спайн-балка + хомуты со стойками). Весь хардвер живёт в ОТДЕЛЬНОЙ
-  //    группе `rig` (world-space, РАВНОМЕРНЫЕ матрицы инстансов), НЕ ребёнком
-  //    неравномерно-масштабируемого n.tube → не растягивается в эллипс. Матрицы
-  //    считаются на layout/resize (планеты статичны), НЕ в кадре. Тёмный матовый
-  //    «gunmetal» (ниже порога bloom 0.18) = холодная рама вокруг горячей энергии.
-  const CORE_R = 1.6;                                  // радиус ядра (вход трубы)
-  const SPINE_OFF = tubeR * 2.4;                       // смещение спайн-балки «вниз» от оси трубы
+  // ── Энерго-ДУГИ: каждый кондуит ВЫГНУТ дугой через глубину в СВОЮ плоскость ──
+  //    (7 дуг в 7 плоскостях/глубинах → силуэт «дышит» при вращении world, плоский
+  //    радиальный «астериск» исчезает). Тот же инженерный язык (металл/стекло-окна/
+  //    бегущая энергия), но геометрия — TubeGeometry по QuadraticBezierCurve3.
+  //    Дуги — per-node (reveal/fade per-planet через material.opacity). Стабилизатор-
+  //    кольца + раструбы — InstancedMesh с общим «gunmetal» (fade в кадре). ПРЯМОЙ
+  //    спайн-балки/стоек НЕТ (давали плоскость/висящую линию) — дуга самонесущая.
+  const CORE_R = 1.6;                                  // радиус ядра (выход дуги)
   const CONN_CORE = 1.8, CONN_PLANET = 1.05;           // масштаб раструбов (у ядра крупнее)
+  const BOW_PERP = 0.30, BOW_Z = 0.42, BOW_MAX = 0.62; // выгиб: ⟂-амплитуда / глубина / кламп (×длину хорды)
+
+  // Энергия и окна бегут ВДОЛЬ дуги. У TubeGeometry V=поперёк трубы (вокруг), U=длина —
+  // поворот текстур на 90° (rotation=PI/2, center 0.5) переносит ось вариации энергии/
+  // окон на ДЛИНУ дуги, поэтому прежний скролл energyTex.offset.y продолжает бежать вдоль.
+  energyTex.rotation = Math.PI / 2; energyTex.center.set(0.5, 0.5);
 
   // Тонкая нормаль-карта кожуха: продольные штрихи + кольцевые риски (брашд-металл).
   const tubeNormalTex = (function () {
     const W = 128, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d');
     g.fillStyle = '#8080ff'; g.fillRect(0, 0, W, H);                 // плоская нормаль (RGB ~128,128,255)
-    for (let i = 0; i < 26; i++) {                                    // продольные штрихи (вдоль трубы)
+    for (let i = 0; i < 26; i++) {                                    // продольные штрихи
       const x = Math.random() * W, w = 1 + Math.random() * 2;
       g.fillStyle = Math.random() < 0.5 ? 'rgba(118,128,255,0.5)' : 'rgba(140,128,255,0.5)';
       g.fillRect(x, 0, w, H);
     }
-    for (let i = 0; i < 10; i++) {                                    // кольцевые риски (поперёк)
+    for (let i = 0; i < 10; i++) {                                    // кольцевые риски
       const y = Math.random() * H;
       g.fillStyle = Math.random() < 0.5 ? 'rgba(128,116,255,0.45)' : 'rgba(128,140,255,0.45)';
       g.fillRect(0, y, W, 1 + Math.random() * 1.5);
@@ -550,34 +555,25 @@ export function start(opts) {
     return t;
   })();
 
-  // Стеклянная гильза: тёмно-винный тинт между энергией (0.62) и кожухом (1.0).
-  // Ребёнок n.tube (цилиндр-труба — равномерных требований нет), общий гео+материал.
-  const glassSleeveGeo = new THREE.CylinderGeometry(tubeR * 0.72, tubeR * 0.72, 1, 18, 1, true);
-  const glassSleeveMat = new THREE.MeshStandardMaterial({
-    color: 0x401015, transparent: true, opacity: 0.22, roughness: 0.12, metalness: 0.0,
-    envMapIntensity: 1.6, side: THREE.DoubleSide, depthWrite: false,
-  });
-
-  // Общий тёмный материал хардвера (муфты/коннекторы/балки/хомуты/стойки).
-  // transparent+opacity → общий fade рига с трубами (intro-reveal / фокус / выбор ядра).
+  // Общий тёмный материал хардвера (стабилизатор-кольца + коннекторы-раструбы).
+  // transparent+opacity → общий fade хардвера с дугами (intro-reveal / фокус / выбор ядра).
   const gunmetalMat = new THREE.MeshStandardMaterial({
     color: 0x1c1e26, metalness: 0.9, roughness: 0.4, envMapIntensity: 1.0, transparent: true,
   });
 
-  // Геометрии хардвера (по 1 на тип → InstancedMesh, ~5 draw call на все 7 труб).
-  const flangeGeo    = new THREE.TorusGeometry(tubeR * 1.38, tubeR * 0.30, 8, 20);   // муфта-кольцо (ось Z)
-  const clampGeo     = new THREE.TorusGeometry(tubeR * 1.18, tubeR * 0.26, 8, 18);   // хомут-манжета (ось Z)
-  const connectorGeo = new THREE.CylinderGeometry(tubeR, tubeR * 2.2, tubeR * 4, 16, 1);  // раструб (узкий→широкий)
-  const spineGeo     = new THREE.CylinderGeometry(tubeR * 0.5, tubeR * 0.5, 1, 8);   // спайн-балка (h=1, scale.y=длина)
-  const strutGeo     = new THREE.CylinderGeometry(tubeR * 0.22, tubeR * 0.22, 1, 8); // стойка хомут→спайн
+  // Геометрии хардвера (по 1 на тип → InstancedMesh, 2 draw call на все 7 дуг).
+  const ringGeo      = new THREE.TorusGeometry(tubeR * 1.30, tubeR * 0.28, 8, 18);       // стабилизатор-кольцо (ось Z = тангенс)
+  const connectorGeo = new THREE.CylinderGeometry(tubeR, tubeR * 2.2, tubeR * 4, 16, 1); // раструб (узкий→широкий)
 
   const rig = new THREE.Group(); world.add(rig);       // world-space → крутится с системой
-  let flangeInst = null, clampInst = null, strutInst = null, spineInst = null, connectorInst = null;
-  // Временные для матриц рига (используются ТОЛЬКО на layout/resize, НЕ в кадре).
-  const _rY = new THREE.Vector3(0, 1, 0), _rZ = new THREE.Vector3(0, 0, 1);
-  const _rDownW = new THREE.Vector3(0, -1, 0), _rAltW = new THREE.Vector3(1, 0, 0);
-  const _rDir = new THREE.Vector3(), _rDown = new THREE.Vector3(), _rAxis = new THREE.Vector3();
-  const _rPos = new THREE.Vector3(), _rScl = new THREE.Vector3(), _rQ = new THREE.Quaternion(), _rM = new THREE.Matrix4();
+  let ringInst = null, connectorInst = null;
+  // Временные для дуг/матриц хардвера (ТОЛЬКО на layout/resize, НЕ в кадре).
+  const _aY = new THREE.Vector3(0, 1, 0), _aZ = new THREE.Vector3(0, 0, 1);
+  const _aUpW = new THREE.Vector3(0, 1, 0), _aAltW = new THREE.Vector3(1, 0, 0);
+  const _aDir = new THREE.Vector3(), _aA = new THREE.Vector3(), _aB = new THREE.Vector3(), _aM = new THREE.Vector3();
+  const _aPerp = new THREE.Vector3(), _aBow = new THREE.Vector3(), _aCtrl = new THREE.Vector3();
+  const _aT0 = new THREE.Vector3(), _aT1 = new THREE.Vector3(), _aAxis = new THREE.Vector3();
+  const _aPos = new THREE.Vector3(), _aScl = new THREE.Vector3(), _aQ = new THREE.Quaternion(), _aMx = new THREE.Matrix4();
 
   // ── Планеты-продукты: фиксированная раскладка по всему экрану ──────────
   // Нормированные позиции (-1..1) по ширине/высоте — каждой планете свой угол
@@ -640,28 +636,32 @@ export function start(opts) {
     grp.scale.setScalar(0.001);                        // спрятан до раскрытия
     world.add(grp);
 
-    // Энерго-труба ядро→планета. Оба цилиндра НЕПРОЗРАЧНЫ (чистый рендер без сортировки):
-    // внутри — поток энергии, снаружи — металлический кожух с окнами через alphaTest
-    // (дырки = стекло, видно энергию). Трансформ/радиус-проявление — в кадре. Торцы открыты
-    // (концы прячутся в ядре/планете). Высота 1 → масштабируется по длине трубы.
-    const tubeEnergy = new THREE.Mesh(
-      new THREE.CylinderGeometry(tubeR * 0.62, tubeR * 0.62, 1, 14, 1, true),
-      new THREE.MeshBasicMaterial({ map: energyTex })
-    );
-    // Окна с ОДИНАКОВЫМ шагом на всех трубах: клон alphaMap, repeat.y под длину (в updateRig).
-    const shellTex = glassTex.clone(); shellTex.needsUpdate = true;
-    const tubeShell = new THREE.Mesh(
-      new THREE.CylinderGeometry(tubeR, tubeR, 1, 22, 1, true),
-      new THREE.MeshStandardMaterial({
-        color: 0x24262f, metalness: 0.96, roughness: 0.28, envMapIntensity: 1.15,
-        alphaMap: shellTex, alphaTest: 0.5, side: THREE.DoubleSide,   // DoubleSide → видна толщина стенки в вырезе
-        normalMap: tubeNormalTex, normalScale: new THREE.Vector2(0.35, 0.35),
-      })
-    );
-    const tubeGlass = new THREE.Mesh(glassSleeveGeo, glassSleeveMat);   // тёмно-винная гильза (ребёнок трубы)
+    // Энерго-ДУГА ядро→планета: TubeGeometry по выгнутой кривой (строится в updateArcs
+    // на layout/resize, НЕ в кадре). Per-node материалы → reveal/fade per-planet через
+    // opacity. Кожух/энергия при opacity≈1 ведут себя как непрозрачные (depthWrite),
+    // винная гильза — поверх (depthWrite:false). Геометрия — плейсхолдер до updateArcs.
+    const curve = new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(), new THREE.Vector3(0, 0.5, 0), new THREE.Vector3(0, 1, 0));
+    const tubeEnergy = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
+      map: energyTex, transparent: true, opacity: 0,                  // бегущая красная энергия
+    }));
+    const shellTex = glassTex.clone();                                // окна — свой клон (ровный шаг по длине)
+    shellTex.rotation = Math.PI / 2; shellTex.center.set(0.5, 0.5);   // V→длина дуги (окна вдоль трубы)
+    shellTex.needsUpdate = true;
+    const tubeShell = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({
+      color: 0x24262f, metalness: 0.96, roughness: 0.28, envMapIntensity: 1.15,
+      alphaMap: shellTex, alphaTest: 0.1, side: THREE.DoubleSide,     // окна-дырки (видна толщина стенки)
+      normalMap: tubeNormalTex, normalScale: new THREE.Vector2(0.35, 0.35),
+      transparent: true, opacity: 0,
+    }));
+    const tubeGlass = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({
+      color: 0x401015, transparent: true, opacity: 0, roughness: 0.12, metalness: 0.0,  // тёмно-винная гильза
+      envMapIntensity: 1.6, side: THREE.DoubleSide, depthWrite: false,
+    }));
+    tubeGlass.renderOrder = 2;
     const tube = new THREE.Group();
     tube.add(tubeEnergy); tube.add(tubeGlass); tube.add(tubeShell);
-    tube.scale.set(0, 0.001, 0);                         // спрятана до раскрытия (радиус 0)
+    tube.visible = false;                                 // скрыта до раскрытия (opacity-reveal)
     world.add(tube);
 
     const lineGeo = new THREE.BufferGeometry();
@@ -676,7 +676,8 @@ export function start(opts) {
 
     return {
       key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams, tube,
-      pradius, shellTex, _stations: 4,                   // для рига: радиус планеты, клон окон, число станций
+      pradius, shellTex, curve, _rings: 2,               // дуга: радиус планеты, клон окон, кривая, число колец
+      tubeShellMesh: tubeShell, tubeEnergyMesh: tubeEnergy, tubeGlassMesh: tubeGlass,
       nx, ny, nz, home: new THREE.Vector3(), target: new THREE.Vector3(),
       ax, ay, az, fx, fy, fz, ph, py, pz, revealed: false,
     };
@@ -827,88 +828,96 @@ export function start(opts) {
     camera.aspect = w / h; camera.updateProjectionMatrix();
     baseDist = fitDistance();
     layoutHomes();
-    if (flangeInst) updateRig();                        // пересчёт матриц рига под новый вьюпорт
+    if (ringInst) updateArcs();                         // пересборка дуг + матриц хардвера под вьюпорт
   }
 
-  // ── Риг труб: построение InstancedMesh-ей (1 раз) + расчёт матриц (layout/resize) ──
-  // Матрицы — в world-space по target-раскладке (планеты статичны после раскладки).
-  // Хардвер НЕ ребёнок растянутого n.tube → равномерные инстансы, без эллипсов.
-  // Reveal — общим fade в кадре (gunmetalMat.opacity), не rebuild.
-  function buildRig() {
+  // ── Энерго-дуги: построение InstancedMesh-хардвера (1 раз) + (пере)сборка кривых ──
+  // Кривые/TubeGeometry строятся из СТАТИЧНОГО n.target (планеты статичны после раскладки)
+  // на layout/resize, НЕ в кадре. На resize TubeGeometry ПЕРЕСОЗДаётся (старую dispose).
+  function buildArcs() {
     let total = 0;
     for (const n of nodes) {
-      const L = Math.max(0.001, n.target.length());
-      const windows = Math.max(3, Math.round(L / 0.6));            // окно ≈ 0.6 ед
-      n._stations = clampv(Math.round(windows / 2), 3, 5);         // станция каждые ~2 окна (3–5)
-      total += n._stations;
+      n._rings = clampv(Math.round(n.target.length() / 1.8), 2, 4);  // редкие стабилизаторы (2–4 на дугу)
+      total += n._rings;
     }
-    flangeInst    = new THREE.InstancedMesh(flangeGeo,    gunmetalMat, total);
-    clampInst     = new THREE.InstancedMesh(clampGeo,     gunmetalMat, total);
-    strutInst     = new THREE.InstancedMesh(strutGeo,     gunmetalMat, total);
-    spineInst     = new THREE.InstancedMesh(spineGeo,     gunmetalMat, nodes.length);
+    ringInst      = new THREE.InstancedMesh(ringGeo,      gunmetalMat, total);
     connectorInst = new THREE.InstancedMesh(connectorGeo, gunmetalMat, nodes.length * 2);
-    [flangeInst, clampInst, strutInst, spineInst, connectorInst].forEach((m) => {
-      m.frustumCulled = false; rig.add(m);              // спаны рига крупные/смещённые — не кулим по сфере инстанса
-    });
-    updateRig();
+    [ringInst, connectorInst].forEach((m) => { m.frustumCulled = false; rig.add(m); });
+    updateArcs();
   }
 
-  function updateRig() {
-    if (!flangeInst) return;
-    let fi = 0;                                          // бегущий индекс станций (flange/clamp/strut общий)
+  // Пересоздать TubeGeometry меша под текущую кривую (старую — dispose).
+  function rebuildTube(n, mesh, radius) {
+    const old = mesh.geometry;
+    mesh.geometry = new THREE.TubeGeometry(n.curve, 44, radius, 8, false);
+    if (old && old.dispose) old.dispose();
+  }
+
+  function updateArcs() {
+    if (!ringInst) return;
+    let ri = 0;                                          // бегущий индекс стабилизатор-колец
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
       const L = Math.max(0.001, n.target.length());
-      const pr = n.pradius;
-      _rDir.copy(n.target).multiplyScalar(1 / L);        // направление ядро→планета (world)
-      if (n.shellTex) n.shellTex.repeat.set(1, Math.max(3, Math.round(L / 0.6)));  // окна: одинаковый шаг
-      // «низ» трубы: фиксированный перпендикуляр к оси (для спайна и стоек)
-      _rDown.copy(_rDownW).addScaledVector(_rDir, -_rDir.dot(_rDownW));
-      if (_rDown.lengthSq() < 1e-4) _rDown.copy(_rAltW).addScaledVector(_rDir, -_rDir.dot(_rAltW));
-      _rDown.normalize();
-      const cH = tubeR * 4 * CONN_CORE, pH = tubeR * 4 * CONN_PLANET;
-      // Коннектор-раструб у ядра (широким концом в ядро, узким к трубе): ось +Y → dir
-      _rQ.setFromUnitVectors(_rY, _rDir);
-      _rPos.copy(_rDir).multiplyScalar(CORE_R * 0.92 + cH * 0.5);
-      _rScl.setScalar(CONN_CORE);
-      _rM.compose(_rPos, _rQ, _rScl); connectorInst.setMatrixAt(i * 2, _rM);
-      // Коннектор-раструб у планеты (ось +Y → −dir: широкий конец входит в сферу планеты)
-      _rAxis.copy(_rDir).negate(); _rQ.setFromUnitVectors(_rY, _rAxis);
-      _rPos.copy(_rDir).multiplyScalar(L - pr * 0.92 - pH * 0.5);
-      _rScl.setScalar(CONN_PLANET);
-      _rM.compose(_rPos, _rQ, _rScl); connectorInst.setMatrixAt(i * 2 + 1, _rM);
-      // Видимый пролёт (для станций-хомутов): от поверхности ядра до поверхности планеты.
-      const t0 = CORE_R * 0.96 + cH, t1 = (L - pr * 0.96) - pH;
-      const span = Math.max(0.001, t1 - t0);
-      // Несущая спайн-балка: ПОЛНОЙ длины трубы (равна основной трубе), смещена «вниз».
-      _rQ.setFromUnitVectors(_rY, _rDir);
-      _rPos.copy(_rDir).multiplyScalar(L * 0.5).addScaledVector(_rDown, SPINE_OFF);
-      _rScl.set(1, L, 1);
-      _rM.compose(_rPos, _rQ, _rScl); spineInst.setMatrixAt(i, _rM);
-      // Станции: муфта (Z→dir) + хомут (Z→dir, концентрично) + стойка (Y→down) к спайну
-      const cnt = n._stations;
-      for (let s = 0; s < cnt; s++) {
-        const t = t0 + span * (s + 0.5) / cnt;
-        _rQ.setFromUnitVectors(_rZ, _rDir); _rPos.copy(_rDir).multiplyScalar(t); _rScl.setScalar(1);
-        _rM.compose(_rPos, _rQ, _rScl);
-        flangeInst.setMatrixAt(fi, _rM); clampInst.setMatrixAt(fi, _rM);
-        const a = tubeR * 1.3, b = SPINE_OFF;             // стойка: от низа хомута до спайн-балки
-        _rQ.setFromUnitVectors(_rY, _rDown);
-        _rPos.copy(_rDir).multiplyScalar(t).addScaledVector(_rDown, (a + b) * 0.5);
-        _rScl.set(1, Math.max(0.001, b - a), 1);
-        _rM.compose(_rPos, _rQ, _rScl); strutInst.setMatrixAt(fi, _rM);
-        fi++;
+      _aDir.copy(n.target).multiplyScalar(1 / L);        // направление ядро→планета (world)
+      _aA.copy(_aDir).multiplyScalar(CORE_R);            // выход из ядра (поверхность)
+      _aB.copy(n.target).addScaledVector(_aDir, -n.pradius);   // вход в планету (поверхность)
+      _aM.copy(_aA).add(_aB).multiplyScalar(0.5);        // середина хорды
+      const chord = _aA.distanceTo(_aB);
+      // bow: перпендикуляр к хорде (своя плоскость на каждую планету) + глубина по знаку nz
+      const upN = Math.abs(_aDir.y) > 0.9 ? _aAltW : _aUpW;
+      _aPerp.copy(_aDir).cross(upN).normalize();
+      _aBow.copy(_aPerp).multiplyScalar(chord * BOW_PERP);
+      _aBow.z += chord * BOW_Z * (n.nz >= 0 ? 1 : -1);   // +nz выгиб К камере, −nz от камеры → разная глубина
+      const maxBow = chord * BOW_MAX;
+      if (_aBow.lengthSq() > maxBow * maxBow) _aBow.setLength(maxBow);   // кламп (узкий портрет не вылезает)
+      _aCtrl.copy(_aM).add(_aBow);
+      // обновляем кривую (мутируем v0/v1/v2) и сбрасываем LUT длины
+      n.curve.v0.copy(_aA); n.curve.v1.copy(_aCtrl); n.curve.v2.copy(_aB);
+      n.curve.updateArcLengths();
+      const arcLen = n.curve.getLength();
+      if (n.shellTex) n.shellTex.repeat.set(1, Math.max(3, Math.round(arcLen / 0.6)));  // окна: ровный шаг по длине
+      // (пере)сборка геометрий кондуита (кожух/энергия/гильза) — старые dispose
+      rebuildTube(n, n.tubeShellMesh,  tubeR);
+      rebuildTube(n, n.tubeEnergyMesh, tubeR * 0.62);
+      rebuildTube(n, n.tubeGlassMesh,  tubeR * 0.72);
+      // Коннекторы-раструбы на обоих концах (вдоль касательной кривой, широким в сферу).
+      n.curve.getTangentAt(0, _aT0); n.curve.getTangentAt(1, _aT1);
+      const hc = tubeR * 4 * CONN_CORE, hp = tubeR * 4 * CONN_PLANET;
+      _aQ.setFromUnitVectors(_aY, _aT0);                 // у ядра: +Y → касательная
+      _aPos.copy(_aA).addScaledVector(_aT0, hc * 0.5);
+      _aScl.setScalar(CONN_CORE);
+      _aMx.compose(_aPos, _aQ, _aScl); connectorInst.setMatrixAt(i * 2, _aMx);
+      _aAxis.copy(_aT1).negate(); _aQ.setFromUnitVectors(_aY, _aAxis);   // у планеты: +Y → −касательная
+      _aPos.copy(_aB).addScaledVector(_aT1, -hp * 0.5);
+      _aScl.setScalar(CONN_PLANET);
+      _aMx.compose(_aPos, _aQ, _aScl); connectorInst.setMatrixAt(i * 2 + 1, _aMx);
+      // Стабилизатор-кольца ВДОЛЬ дуги: ось кольца (Z) = тангенс кривой, точка = getPointAt.
+      const R = n._rings;
+      for (let k = 0; k < R; k++) {
+        const tt = (k + 1) / (R + 1);
+        n.curve.getPointAt(tt, _aPos); n.curve.getTangentAt(tt, _aT0);
+        _aQ.setFromUnitVectors(_aZ, _aT0); _aScl.setScalar(1);
+        _aMx.compose(_aPos, _aQ, _aScl); ringInst.setMatrixAt(ri, _aMx);
+        ri++;
       }
     }
     connectorInst.instanceMatrix.needsUpdate = true;
-    spineInst.instanceMatrix.needsUpdate = true;
-    flangeInst.instanceMatrix.needsUpdate = true;
-    clampInst.instanceMatrix.needsUpdate = true;
-    strutInst.instanceMatrix.needsUpdate = true;
+    ringInst.instanceMatrix.needsUpdate = true;
+  }
+
+  // Reveal/fade дуги per-planet: opacity на 3 материалах кондуита (+ visible-гейт).
+  function setConduitOpacity(n, k) {
+    const vis = k > 0.004;
+    n.tube.visible = vis;
+    if (!vis) return;
+    n.tubeShellMesh.material.opacity = k;
+    n.tubeEnergyMesh.material.opacity = k;
+    n.tubeGlassMesh.material.opacity = 0.22 * k;
   }
 
   onResize();
-  buildRig();
+  buildArcs();
 
   // ── Параллакс + вращение системы мышью (ЛКМ) + зум колесом ────────────
   let mx = 0, my = 0, tmx = 0, tmy = 0;
@@ -1224,12 +1233,9 @@ export function start(opts) {
       n.home.lerp(n.target, Math.min(1, dt * 2.6));      // плавная подстройка под экран
       const p = tmp.copy(n.home);                        // планета стоит на месте (без дрейфа)
       n.grp.position.copy(p);
-      // Труба ядро(0,0,0)→планета: центр посередине, ось Y вдоль направления, длина = |home|.
-      // Радиус (scale x/z) задаётся ниже по фазе (проявление / гаснет на зуме).
-      n.tube.position.copy(n.home).multiplyScalar(0.5);
-      n.tube.quaternion.setFromUnitVectors(_yAxis, _td.copy(n.home).normalize());
-      n.tube.scale.y = n.home.length() || 0.001;
-      // планеты статичны — самовращение убрано (выглядело неестественно)
+      // Энерго-дуга — СТАТИЧНАЯ геометрия (построена в updateArcs из n.target в world-
+      // координатах), в кадре НЕ трансформируется. Reveal/fade — через opacity (ниже).
+      // Планеты статичны — самовращение убрано (выглядело неестественно).
 
       // Швы куба: зажигаются и пульсируют при фокусе (клике) на планете.
       // Швы куба: зажигаются и пульсируют только при приближении (фокус/клик).
@@ -1258,25 +1264,20 @@ export function start(opts) {
         if (k >= 1 && !n.revealed) { n.revealed = true; revealKey(n.key); if (i === 0) revealCore(); }
         const grow = clamp01((t - (tStart + PULSE_DUR - 120)) / 360);
         n.grp.scale.setScalar(ease(grow));
-        n.tube.scale.x = n.tube.scale.z = ease(grow);    // труба «вырастает» с планетой
+        setConduitOpacity(n, ease(grow));                // дуга «проявляется» с планетой
         n.halo.material.opacity = ease(grow) * 0.85;
       } else {
         const vis = (focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim);
         n.grp.scale.setScalar(vis);
-        n.tube.scale.x = n.tube.scale.z = vis * (1 - fp);   // труба гаснет с планетой и на зуме
-        n.halo.material.opacity = 0.58;                   // статичный ореол (без «дыхания»/вращения)
-
-        // Обычная простая линия, связывающая ядро и планету.
-        n.line.material.opacity = 0.16 * (1 - fp) * (1 - coreDim);   // гаснет при наезде/возврате и при выборе Platform
-        const lp = n.line.geometry.attributes.position.array;
-        lp[0] = 0; lp[1] = 0; lp[2] = 0; lp[3] = p.x; lp[4] = p.y; lp[5] = p.z;
-        n.line.geometry.attributes.position.needsUpdate = true;
+        setConduitOpacity(n, vis * (1 - fp));            // дуга гаснет с планетой и на зуме
+        n.halo.material.opacity = 0.58;                  // статичный ореол (без «дыхания»/вращения)
+        n.line.material.opacity = 0;                     // прямую радиальную линию прячем (дуга = связь)
       }
     }
 
-    // Хардвер труб (риг): общий fade с трубами — intro-reveal в финале интро + гаснет
-    // на фокусе/выборе ядра (как сами трубы). Дёшево: одна opacity на общий gunmetal.
-    if (flangeInst) {
+    // Хардвер дуг (кольца+раструбы): общий fade — intro-reveal в финале интро + гаснет
+    // на фокусе/выборе ядра. Дёшево: одна opacity на общий gunmetal.
+    if (ringInst) {
       const rb = phase === 'intro' ? clamp01((t - (END - 1400)) / 1400) : 1;
       const rigVis = rb * (1 - fp) * (1 - coreDim);
       rig.visible = rigVis > 0.012;
