@@ -560,11 +560,13 @@ export function start(opts) {
     world.add(grp);
 
     // Персональное кольцо-орбита планеты (радиус/ориентация задаются в layoutRings).
-    // depthTest=on → ядро/планета перекрывают дальнюю часть кольца (эффект продевания).
+    // depthTest=off + renderOrder → орбита рисуется ПОВЕРХ планеты → линия проходит
+    // ровно по середине планеты (через её центр), а не прячется за ней.
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(1, 0.02, 8, 160),
-      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false })
+      new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, depthTest: false })
     );
+    ring.renderOrder = 1;
     world.add(ring);
 
     const lineGeo = new THREE.BufferGeometry();
@@ -1096,12 +1098,12 @@ export function start(opts) {
         if (k >= 1 && !n.revealed) { n.revealed = true; revealKey(n.key); if (i === 0) revealCore(); }
         const grow = clamp01((t - (tStart + PULSE_DUR - 120)) / 360);
         n.grp.scale.setScalar(ease(grow));
-        n.ring.material.opacity = 0.26 * ease(grow);
+        n.ring.material.opacity = 0.32 * ease(grow);     // траектория проявляется с планетой
         n.halo.material.opacity = ease(grow) * 0.85;
       } else {
         const vis = (focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim);
         n.grp.scale.setScalar(vis);
-        n.ring.material.opacity = 0.26 * vis;             // кольцо гаснет вместе со своей планетой
+        n.ring.material.opacity = 0.32 * vis * (1 - fp);  // траектория планеты; гаснет с планетой и на зуме
         n.halo.material.opacity = 0.58 + 0.06 * Math.sin(tsec * 0.6 + i);   // лёгкое «дыхание»
         n.halo.material.rotation += dt * (0.035 + (i % 3) * 0.012);          // медленное вращение облака
 
