@@ -113,6 +113,7 @@ function cardData(key) {
       detail: (el.getAttribute('data-detail') || '').trim(),     // длинное описание (карточка детали)
       slogan: (el.getAttribute('data-slogan') || '').trim(),     // слоган
       live: badgeEl ? badgeEl.classList.contains('live') : true,
+      beta: badgeEl ? badgeEl.classList.contains('beta') : false,
       badge: badgeEl ? badgeEl.textContent.trim() : (key === 'platform' ? 'Ядро' : ''),
       cta: ctaEl ? ctaEl.textContent.trim() : (key === 'platform' ? 'Скачать' : ''),
       icon: img ? img.getAttribute('src') : ICON[key],
@@ -778,7 +779,7 @@ export function start(opts) {
     pc.nm.textContent = d.name;
     pc.sub.textContent = d.sub; pc.sub.style.display = d.sub ? '' : 'none';
     pc.desc.textContent = d.desc; pc.desc.style.display = d.desc ? '' : 'none';
-    pc.badge.textContent = d.badge; pc.badge.className = 'pc-badge ' + (d.live ? 'live' : 'soon');
+    pc.badge.textContent = d.badge; pc.badge.className = 'pc-badge ' + (d.beta ? 'beta' : d.live ? 'live' : 'soon');
     pc.badge.style.display = d.badge ? '' : 'none';
     if (pc.cta) pc.cta.style.display = 'none';     // запуск убран — всё через лаунчер
   }

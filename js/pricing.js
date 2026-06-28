@@ -117,16 +117,21 @@ const Pricing = (() => {
 
     // overflow-x:auto — механика горизонтальной прокрутки ВНУТРИ обёртки
     // (узкий экран не распирает документ). Визуал доводит web-design-ux.
+    // Обёртка-«скоуп» не скроллится → подсказка прокрутки стоит на месте (на мобиле
+    // таблица шире экрана и прячется в горизонтальный скролл без явного аффорданса).
     return `
-      <div class="pricing-table-wrap reveal" role="region"
-           aria-label="Тарифы HH, Avito и Комбо" tabindex="0"
-           style="overflow-x:auto;-webkit-overflow-scrolling:touch">
-        <table class="pricing-table">
-          <thead>
-            <tr><th class="pt-corner" scope="col">Инструмент</th>${head}</tr>
-          </thead>
-          <tbody>${body}</tbody>
-        </table>
+      <div class="pricing-table-scope reveal">
+        <span class="pt-scroll-hint" aria-hidden="true">Листайте таблицу вбок →</span>
+        <div class="pricing-table-wrap" role="region"
+             aria-label="Тарифы HH, Avito и Комбо" tabindex="0"
+             style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+          <table class="pricing-table">
+            <thead>
+              <tr><th class="pt-corner" scope="col">Инструмент</th>${head}</tr>
+            </thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
       </div>`;
   }
 
@@ -159,8 +164,9 @@ const Pricing = (() => {
   function _tasksBlock() {
     return `
       <div class="pricing-info pricing-tasks reveal">
-        <h3>Биржа задач</h3>
+        <h3>Биржа задач <span class="pricing-beta-tag">Бета</span></h3>
         <p>Заказчики и исполнители — в одном окне. Начать можно бесплатно.</p>
+        <p class="pricing-beta-note">Биржа работает в бета-режиме: режим заморозки денег (безопасная сделка) сейчас в разработке.</p>
         <div class="pub-plans">
           <div class="pub-plan">
             <span class="pub-plan-name">Free</span>

@@ -7,7 +7,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 vacantrix-web/
 ├── index.html                  ← Главная страница (каталог, авторизация, настройки)
-├── admin.html                  ← Панель администратора
 ├── schema.sql                  ← SQL-схема таблиц Supabase
 ├── vx_profiles_migration.sql   ← Миграция таблицы vx_profiles (уже применена)
 ├── css/
@@ -18,8 +17,7 @@ vacantrix-web/
 │   ├── profile.js      (Profile — загрузка vx_profiles, displayName, subscriptionText)
 │   ├── platforms.js    (Platforms — вкладка «Наши площадки», сейчас статический «Скоро»)
 │   ├── apps.js         (Apps — вкладка приложений, лайтбокс, скачивание)
-│   ├── main.js         (оркестратор главной страницы)
-│   └── admin.js        (AdminPanel — управление контентом)
+│   └── main.js         (оркестратор главной страницы)
 └── img/                (иконки, скриншоты приложений)
 ```
 
@@ -37,7 +35,10 @@ git push
 GitHub Pages пересобирается автоматически (~1 мин).
 
 - **Сайт:** `https://vacantrix.github.io/vacantrix-web/`
-- **Админ-панель:** `https://vacantrix.github.io/vacantrix-web/admin.html`
+
+> ⚠️ Админ-панель удалена из сайта (2026-06-28). Управление контентом (площадки/приложения) будет
+> отдельным приложением управления экосистемой. Таблица `web_user_roles` и RLS-роль `admin` оставлены
+> как бэкенд-авторизация (нужны для записи в `web_apps`/`web_platforms` и партнёрскую программу).
 
 ## Конфигурация
 
@@ -74,11 +75,11 @@ const SUPABASE_ANON = '...';  // anon/publishable ключ
 | `Auth.verifyOtp(email, token)` | Подтверждение OTP-кода |
 | `Auth.register(email, pwd)` | Регистрация |
 | `Auth.signOut()` | Выход |
-| `Auth.onChange(cb)` | Подписка на изменения сессии — `cb(user, isAdmin)` |
+| `Auth.onChange(cb)` | Подписка на изменения сессии — `cb(user)` |
 | `Auth.currentUser()` | Текущий пользователь (объект Supabase) |
-| `Auth.isAdmin()` | Проверка роли admin |
 
-Роли хранятся в таблице `web_user_roles`. Первый зарегистрировавшийся автоматически получает роль `admin`.
+Роль `admin` хранится в таблице `web_user_roles` и используется только как бэкенд-авторизация (RLS).
+Клиентской проверки роли на сайте больше нет — админ-панель удалена.
 
 ### Профиль (`profile.js`)
 
@@ -109,7 +110,7 @@ const SUPABASE_ANON = '...';  // anon/publishable ключ
 |---------|-----------|
 | `web_platforms` | Наши каналы/сообщества (Telegram, VK и др.) — пока пустая |
 | `web_apps` | Карточки приложений (name, download_url, screenshots и др.) |
-| `web_user_roles` | Роли пользователей (`user` / `admin`) |
+| `web_user_roles` | Роли пользователей (`user` / `admin`) — бэкенд-authz (RLS), без UI на сайте |
 | `vx_profiles` | Единый профиль пользователя (display_name, hh_applicant_id, avito_user_id, подписка) |
 
 `vx_profiles` — кросс-проектная таблица, общая с `vacantrix-platform` и `vacantrix-hh`.

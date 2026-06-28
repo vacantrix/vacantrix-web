@@ -50,7 +50,7 @@ const Apps = (() => {
              <span class="dl-icon">🖥</span>
              <div class="dl-text">
                <span class="dl-title">Скачать для Windows</span>
-               <span class="dl-sub">Бесплатно · Без установки</span>
+               <span class="dl-sub">Бесплатно · Windows</span>
              </div>
              <span class="dl-arrow">↓</span>
            </button>`

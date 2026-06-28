@@ -9,11 +9,10 @@ const Auth = (() => {
 
   // ── Состояние ───────────────────────────────────────────────────────
   let _currentUser = null;
-  let _isAdmin     = false;
   const _listeners = [];
 
   function _notify() {
-    _listeners.forEach(fn => fn(_currentUser, _isAdmin));
+    _listeners.forEach(fn => fn(_currentUser));
   }
 
   function onChange(fn) {
@@ -31,17 +30,14 @@ const Auth = (() => {
       _currentUser = null;
     } else if (session) {
       _currentUser = session.user;
-      _isAdmin = await _checkAdmin(_currentUser.id);
     }
     _notify();
 
     db.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
         _currentUser = session.user;
-        _isAdmin = await _checkAdmin(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         _currentUser = null;
-        _isAdmin = false;
       }
       _notify();
     });
@@ -52,6 +48,9 @@ const Auth = (() => {
   const CONSENT_VERSION = '2026-06-27';
   async function register(email, password, opts = {}) {
     const nowIso = new Date().toISOString();
+    // Реферальный код (если пришёл по ссылке партнёра ?ref=) → в user_metadata.
+    // Серверный триггер bind_referral создаст связку referrals при создании юзера.
+    const refCode = (typeof Referral !== 'undefined' && Referral.code && Referral.code()) || null;
     const { data, error } = await db.auth.signUp({
       email, password,
       options: {
@@ -64,6 +63,7 @@ const Auth = (() => {
           marketing_consent: !!opts.marketing,
           marketing_consent_version: opts.marketing ? CONSENT_VERSION : null,
           marketing_consent_at: opts.marketing ? nowIso : null,
+          ref_code: refCode,
         },
       },
     });
@@ -81,7 +81,6 @@ const Auth = (() => {
       localStorage.setItem(REMEMBER_KEY, '1');
       sessionStorage.setItem(REMEMBER_KEY, '1');
       _currentUser = data.user;
-      _isAdmin = await _checkAdmin(data.user.id);
       _notify();
       return { needsOtp: false };
     } else {
@@ -108,7 +107,6 @@ const Auth = (() => {
     if (error) throw error;
     localStorage.removeItem(PENDING_KEY);
     _currentUser = data.user;
-    _isAdmin = await _checkAdmin(data.user.id);
     _notify();
     return data;
   }
@@ -120,19 +118,7 @@ const Auth = (() => {
     localStorage.removeItem(PENDING_KEY);
     sessionStorage.removeItem(REMEMBER_KEY);
     _currentUser = null;
-    _isAdmin = false;
     _notify();
-  }
-
-  // ── Проверка роли ───────────────────────────────────────────────────
-  async function _checkAdmin(userId) {
-    if (!userId) return false;
-    const { data } = await db
-      .from('web_user_roles')
-      .select('role')
-      .eq('user_id', userId)
-      .single();
-    return data?.role === 'admin';
   }
 
   // ── Смена пароля ────────────────────────────────────────────────────
@@ -143,11 +129,10 @@ const Auth = (() => {
 
   // ── Геттеры ─────────────────────────────────────────────────────────
   function currentUser() { return _currentUser; }
-  function isAdmin()     { return _isAdmin; }
   function isLoggedIn()  { return !!_currentUser; }
   function pendingEmail(){ return localStorage.getItem(PENDING_KEY); }
 
   return { init, register, loginPassword, verifyOtp, signOut,
-           updatePassword, currentUser, isAdmin, isLoggedIn,
+           updatePassword, currentUser, isLoggedIn,
            pendingEmail, onChange };
 })();

@@ -11,6 +11,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function _initReveal() {
+    // Фолбэк: нет IntersectionObserver (старый браузер) → показываем всё сразу,
+    // иначе .reveal-секции навсегда остались бы с opacity:0 (пустые провалы).
+    if (!('IntersectionObserver' in window)) {
+      document.querySelectorAll('.reveal:not(.visible)').forEach(el => el.classList.add('visible'));
+      return;
+    }
     const obs = new IntersectionObserver(entries => {
       entries.forEach(e => {
         if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }
@@ -56,10 +62,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ── Navbar ────────────────────────────────────────────────────────────
-  function _updateNavbar(user, isAdmin) {
+  function _updateNavbar(user) {
     document.getElementById('btn-login') ?.classList.toggle('hidden', !!user);
     document.getElementById('btn-logout')?.classList.toggle('hidden', !user);
-    document.getElementById('btn-admin') ?.classList.toggle('hidden', !isAdmin);
     const ui   = document.getElementById('user-info');
     const chip = document.getElementById('user-chip');
     // Показываем display_name если есть, иначе email
@@ -82,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const arrow = btn.querySelector('.dl-arrow');
     if (user) {
       btn.classList.remove('btn-download-lock');
-      if (sub)   sub.textContent   = 'Бесплатно · Windows · Без установки';
+      if (sub)   sub.textContent   = 'Бесплатно · Windows · Установка за минуту';
       if (arrow) arrow.textContent = '↓';
       btn.onclick = () => {
         const t = document.getElementById('ig-title');
@@ -255,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           await Profile.linkHH(id, user.id);
           _renderSettings(user);  // перерисовываем с обновлёнными данными
-          _updateNavbar(user, Auth.isAdmin());
+          _updateNavbar(user);
         } catch (e) {
           if (err) err.textContent = e.message;
         }
@@ -270,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           await Profile.linkAvito(id, user.id);
           _renderSettings(user);
-          _updateNavbar(user, Auth.isAdmin());
+          _updateNavbar(user);
         } catch (e) {
           if (err) err.textContent = e.message;
         }
@@ -281,7 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!confirm('Отвязать приложения от этого аккаунта?')) return;
         await Profile.unlink();
         _renderSettings(user);
-        _updateNavbar(user, Auth.isAdmin());
+        _updateNavbar(user);
       });
     }
     _initReveal();
@@ -311,20 +316,81 @@ document.addEventListener('DOMContentLoaded', () => {
   //  2. Инициализируем данные в фоне (без блокировки UI)
   // ════════════════════════════════════════════════════════════════════
 
-  // ── 1. Вкладки (регистрация немедленно) ─────────────────────────────
+  // ── 1. Хэш-роутер вкладок: каждый раздел шапки = отдельная «страница» ─
+  // Разделы ведут себя как самостоятельные страницы: при переключении меняется
+  // URL (#apps, #pricing, #about, #support, #partner, #settings), работает
+  // кнопка «Назад» браузера, обновление (F5) и прямые ссылки открывают нужный
+  // раздел. Главная — чистый корень без хэша. Маршрут #app/<key> принадлежит
+  // appdetail.js: _tabFromHash возвращает для него null → роутер вкладок его не трогает.
+  // 'integrations' — под-страница карточки «Интеграции» (#integrations). В топбаре её
+  // НЕТ, но роутер обязан знать имя хэша, иначе _tabFromHash вернёт 'home' и клик с
+  // карточки уведёт на Главную. Навигация — нативным <a href="#integrations">.
+  const TAB_NAMES = new Set(['home', 'apps', 'pricing', 'about', 'support', 'partner',
+                             'integrations', 'partner-program', 'settings']);
+  const TAB_TITLES = {
+    home:               'Vacantrix — единая экосистема инструментов',
+    apps:               'Приложения — Vacantrix',
+    pricing:            'Тарифы — Vacantrix',
+    about:              'О Vacantrix',
+    support:            'Поддержка — Vacantrix',
+    partner:            'Сотрудничество — Vacantrix',
+    integrations:       'Интеграции — Vacantrix',
+    'partner-program':  'Партнёрская программа — Vacantrix',
+    settings:           'Настройки — Vacantrix',
+  };
+
+  // Хэш → имя вкладки. null = маршрут приложения (#app/<key>), не наш.
+  function _tabFromHash() {
+    const h = (location.hash || '').replace(/^#\/?/, '');
+    if (!h) return 'home';
+    if (h.indexOf('app/') === 0) return null;        // раздел приложения — за appdetail.js
+    return TAB_NAMES.has(h) ? h : 'home';            // неизвестный хэш → Главная
+  }
+
+  function _activateTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll(`.tab-btn[data-tab="${name}"]`).forEach(b => b.classList.add('active'));
+    document.getElementById(`tab-${name}`)?.classList.add('active');
+    if (TAB_TITLES[name]) document.title = TAB_TITLES[name];
+    try { window.scrollTo(0, 0); } catch (e) {}
+    requestAnimationFrame(_initReveal);
+  }
+
+  // Применяет текущий хэш к интерфейсу (hashchange / popstate / первая загрузка).
+  function _routeTab() {
+    const name = _tabFromHash();
+    if (name === null) return;                       // #app/<key> отрисует appdetail.js
+    // Сходим с раздела приложения, если были на нём (clearRoute — no-op вне app-роута,
+    // вкладку с реальным хэшем не трогает).
+    if (window.AppDetail && AppDetail.clearRoute) AppDetail.clearRoute();
+    _activateTab(name);
+  }
+
+  // Навигация по клику вкладки: меняем адрес → роутер сам отрисует раздел.
+  function _goTab(name) {
+    name = name || 'home';
+    if (name === 'home') {
+      // Главная — чистый корень. pushState не шлёт hashchange → маршрутизируем вручную.
+      if (location.hash) {
+        try { history.pushState(null, '', location.pathname + location.search); }
+        catch (e) { location.hash = ''; }
+      }
+      _routeTab();
+    } else if (location.hash === '#' + name) {
+      _routeTab();                                   // тот же хэш → события нет, рендерим вручную
+    } else {
+      location.hash = '#' + name;                    // → hashchange → _routeTab
+    }
+  }
+
   document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const target = btn.dataset.tab;
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById(`tab-${target}`)?.classList.add('active');
-      // Уход с app-роута (#app/<key>): чистим хэш и прячем #tab-app. Активную
-      // вкладку мы уже выставили выше — clearRoute её НЕ трогает.
-      if (window.AppDetail && AppDetail.clearRoute) AppDetail.clearRoute();
-      requestAnimationFrame(_initReveal);
-    });
+    btn.addEventListener('click', () => _goTab(btn.dataset.tab));
   });
+
+  window.addEventListener('hashchange', _routeTab);
+  window.addEventListener('popstate',  _routeTab);
+  _routeTab();   // первичный разбор хэша — прямые ссылки и F5 открывают нужный раздел
 
   // ── 1. Плитки «Инструменты экосистемы» (2D) кликабельны → раздел приложения ─
   // В 3D-режиме планеты обрабатывает intro3d.js (плитки .eco-stage скрыты), здесь
@@ -452,20 +518,20 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ── Подписка на изменения авторизации ────────────────────────────────
-  Auth.onChange(async (user, isAdmin) => {
+  Auth.onChange(async (user) => {
     if (user) {
       // Загружаем профиль из vx_profiles; ошибка не должна ломать остальной UI/каталог
       try { await Profile.load(user.id); }
       catch (e) { console.warn('Profile.load error:', e.message); }
     }
-    _updateNavbar(user, isAdmin);
+    _updateNavbar(user);
     Apps.rerender();
     _renderSettings(user);
     _updateHeroBtn(user);
   });
 
   // ── Начальное состояние UI (до загрузки данных) ───────────────────────
-  _updateNavbar(null, false);
+  _updateNavbar(null);
   _renderSettings(null);
   _updateHeroBtn(null);
 
@@ -494,7 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
       try { await Profile.load(curUser.id); }
       catch (e) { console.warn('Profile.load error:', e.message); }
     }
-    _updateNavbar(curUser, Auth.isAdmin());
+    _updateNavbar(curUser);
     _renderSettings(curUser);
     _updateHeroBtn(curUser);
 

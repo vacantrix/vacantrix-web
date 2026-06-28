@@ -143,11 +143,14 @@ const AppDetail = (() => {
             <div class="ad-hero">
               ${ico}
               <div>
-                <span class="ad-status ${isLive ? 'live' : 'soon'}">${isLive ? 'Работает' : 'Скоро'}</span>
+                <span class="ad-status ${d.beta ? 'beta' : isLive ? 'live' : 'soon'}">${d.beta ? 'Бета' : isLive ? 'Работает' : 'Скоро'}</span>
                 <h2 class="ad-name">${_esc(d.name)}</h2>
                 <p class="ad-tagline">${_esc(d.tagline)}</p>
               </div>
             </div>
+
+            ${d.beta && d.betaNote ? `
+              <div class="ad-beta-note">${_esc(d.betaNote)}</div>` : ''}
 
             ${d.video ? `
               <div class="ad-video">

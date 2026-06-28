@@ -28,7 +28,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, must-revalidate">
   <!-- CSS грузим с авто-меткой версии (всегда свежий стиль) -->
   <script>document.write('<link rel="stylesheet" href="css/main.css?v=' + Date.now() + '">');</script>
-  <noscript><link rel="stylesheet" href="css/main.css"></noscript>
+  <noscript><link rel="stylesheet" href="css/main.css"><style>.reveal{opacity:1!important;transform:none!important}</style></noscript>
 
   <!-- Three.js (ESM) для 3D-интро. Import map должен идти ДО любого module-скрипта. -->
   <script type="importmap">
@@ -148,6 +148,7 @@
   .eco-badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
   .eco-badge.live { color: #58e08a; background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3); }
   .eco-badge.soon { color: var(--text3); background: rgba(255,255,255,.05); border: 1px solid var(--border2); }
+  .eco-badge.beta { color: #f5b34a; background: rgba(245,179,74,.12); border: 1px solid rgba(245,179,74,.32); }
   .eco-cta { font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-d));
     border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-family: inherit; }
   .eco-cta.ghost { color: var(--accent-b); background: transparent; border: 1px solid var(--border); }
@@ -347,6 +348,7 @@
   #planet-card .pc-badge { font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 8px; border-radius: 6px; }
   #planet-card .pc-badge.live { color: #58e08a; background: rgba(46,204,113,.12); border: 1px solid rgba(46,204,113,.3); }
   #planet-card .pc-badge.soon { color: var(--text3); background: rgba(255,255,255,.05); border: 1px solid var(--border2); }
+  #planet-card .pc-badge.beta { color: #f5b34a; background: rgba(245,179,74,.12); border: 1px solid rgba(245,179,74,.32); }
   #planet-card .pc-cta { font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-d)); border-radius: 8px; padding: 6px 12px; }
 
   /* ══════════ Топбар: 5 вкладок с кастомными иконками и анимациями ══════════ */
@@ -420,6 +422,46 @@
   .ic-cta { display: inline-block; margin-top: 13px; color: var(--accent-b); font-weight: 700; font-size: 13px; }
   @media (max-width: 760px) { .info-grid { grid-template-columns: 1fr; } }
 
+  /* ══════════ Под-страница «Интеграции» (#tab-integrations) ══════════
+     Навигируемый раздел карточки «Интеграции». Переиспользует токены .ad-*/.info-card
+     (тот же бренд), здесь — только обвязка под одноколоночную страницу без рельса. */
+  .integrations-page { max-width: 900px; margin: 0 auto; }
+  .integrations-page .ad-back { text-decoration: none; }   /* .ad-back — кнопка в appdetail; тут <a>, гасим подчёркивание */
+  .integrations-page .ad-hero { margin-top: 2px; }
+  .integrations-page .ad-hero-ico svg { width: 34px; height: 34px; }
+  .integrations-page .info-grid { grid-template-columns: repeat(2, 1fr); max-width: 720px; margin-top: 2px; }
+  .integrations-note { margin: 6px 0 0; padding: 14px 16px; border-radius: 12px;
+    background: var(--glass2); border: 1px solid var(--border2); color: var(--text2);
+    font-size: 13.5px; line-height: 1.6; }
+  .integrations-cta { max-width: 420px; margin: 30px auto 0; text-align: center; }
+  .integrations-cta-alt { margin-top: 14px; color: var(--text3); font-size: 13px; }
+  .integrations-cta-alt a { color: var(--accent-b); font-weight: 600; text-decoration: none; }
+  .integrations-cta-alt a:hover { text-decoration: underline; }
+  /* выше базовой .info-grid по специфичности → возвращаем 1 колонку на телефоне */
+  @media (max-width: 760px) { .integrations-page .info-grid { grid-template-columns: 1fr; } }
+
+  /* ══════════ Под-страница «Партнёрская программа» (#tab-partner-program) ══════════
+     Кабинет наполняет js/partner.js. Переиспользует .info-card/.settings-card/.sec-head
+     и токены — без нового визуального языка; здесь только обвязка кабинета. */
+  .partner-page { max-width: 900px; margin: 0 auto; }
+  .partner-page .ad-back { text-decoration: none; display: inline-block; margin-bottom: 6px; }
+  .pp-check { display: flex; gap: 10px; align-items: flex-start; margin: 9px 0; cursor: pointer;
+    font-size: 13.5px; color: var(--text2); line-height: 1.5; }
+  .pp-check input { margin-top: 3px; flex-shrink: 0; }
+  .pp-check a { color: var(--accent-b); }
+  .pp-msg { font-size: 13px; color: var(--text3); margin: 6px 0; }
+  .pp-msg.err { color: #ff6b6b; }
+  .pp-linkrow { display: flex; gap: 8px; align-items: center; }
+  .pp-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 720px; margin: 20px auto 0; }
+  .pp-stat { background: var(--glass); border: 1px solid var(--border2); border-radius: 14px; padding: 16px 12px; text-align: center; }
+  .pp-stat .v { font-size: 22px; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .pp-stat .k { font-size: 12px; color: var(--text2); margin-top: 5px; }
+  .pp-stat.accent { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(230,57,70,.18); }
+  .pp-stat.accent .v { color: var(--accent-b); }
+  .pp-cards2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; max-width: 720px; margin: 18px auto 0; }
+  @media (max-width: 760px) { .pp-stats { grid-template-columns: repeat(2, 1fr); } .pp-cards2 { grid-template-columns: 1fr; } }
+  @media (max-width: 420px) { .pp-stats { grid-template-columns: 1fr; } }
+
   /* ══════════ Мобильная доводка топбара и панели планеты ══════════ */
   @media (max-width: 600px) {
     /* при входе в шапке оставляем только аватар — имя занимает место */
@@ -436,6 +478,47 @@
      прогресс прокрутки приходит в --scroll-progress из js/scrollfx.js. */
   #scroll-anim { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1;
     pointer-events: none; }
+
+  /* ══════════ Мобильная нижняя навигация (≤760px) ══════════
+     На телефоне лента вкладок топбара сжималась до ~58px и прятала 3 из 5 вкладок
+     без скролл-аффорданса (О нас / Поддержка / Сотрудничество были недоступны).
+     Переносим навигацию в фикс-панель снизу: крупные тач-цели, всегда видна.
+     Кнопки — те же .tab-btn[data-tab], их биндит main.js (делегирование) → доп. JS
+     не нужен. «Главная» открывается по логотипу «Vacantrix» слева в топбаре. */
+  .mnav { display: none; }
+  @media (max-width: 760px) {
+    .tp-tabs { display: none; }                 /* вкладки уехали в нижнюю панель */
+    #scroll-anim { display: none; }             /* декор-линия мешала бы нижней панели */
+    body { padding-bottom: calc(62px + env(safe-area-inset-bottom, 0px)); }
+    #global-info { bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+
+    .mnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1300;
+      gap: 2px; padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+      background: var(--glass); backdrop-filter: var(--blur);
+      border-top: 1px solid var(--border2); }
+    .mnav-btn { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column;
+      align-items: center; gap: 3px; padding: 6px 2px; border: none; border-radius: 11px;
+      background: transparent; color: var(--text2); font-family: inherit;
+      font-size: 10px; font-weight: 600; cursor: pointer;
+      transition: color .2s ease, background .2s ease; -webkit-tap-highlight-color: transparent; }
+    .mnav-btn .mnav-ic { width: 23px; height: 23px; display: grid; place-items: center;
+      transition: transform .2s ease, filter .2s ease; }
+    .mnav-btn .mnav-ic svg { width: 100%; height: 100%; }
+    .mnav-btn .mnav-lbl { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mnav-btn:active { background: rgba(255,255,255,.06); }
+    .mnav-btn.active { color: var(--accent-b); }
+    .mnav-btn.active .mnav-ic { transform: translateY(-1px); filter: drop-shadow(0 0 6px rgba(230,57,70,.9)); }
+  }
+  /* очень узкие: бренд и кнопка входа ужимаются, чтобы топбар не переполнялся */
+  @media (max-width: 380px) {
+    .tp-brand { font-size: 16px; margin-right: 4px; }
+    .tp-actions .btn-primary { padding: 9px 13px; }
+  }
+  /* крупнее тач-цели на телефоне (кнопки карточек экосистемы + переключатель формата) */
+  @media (max-width: 760px) {
+    .eco-cta { padding: 9px 15px; }     /* было 6px 12px → высота ~36px */
+    .fmt-btn { height: 34px; }
+  }
   </style>
 </head>
 <body>
@@ -494,7 +577,6 @@
       </span>
       <span id="user-info"></span>
     </span>
-    <a id="btn-admin" class="btn-ghost hidden" href="admin.html">Панель</a>
     <button id="btn-login" class="btn-primary">Войти</button>
     <button id="btn-logout" class="btn-outline hidden">Выйти</button>
   </div>
@@ -536,7 +618,7 @@
         <span class="dl-icon">🖥</span>
         <div class="dl-text">
           <span class="dl-title">Скачать Vacantrix Platform</span>
-          <span class="dl-sub">Бесплатно · Windows · Без установки</span>
+          <span class="dl-sub">Бесплатно · Windows · Установка за минуту</span>
         </div>
         <span class="dl-arrow">↓</span>
       </button>
@@ -592,18 +674,18 @@
         <div class="desc">Пока другие ищут — вы откликнулись.</div>
         <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Скачать</button></div>
       </div>
-      <div class="eco-node n-tasks" data-key="tasks" data-slogan="Задачи и исполнители — в одном окне" data-detail="Биржа для заказчиков и исполнителей: размещайте задачи, выбирайте исполнителя по рейтингу и отзывам, общайтесь во встроенном чате. Условно бесплатно — 1 заказ и 3 отклика в месяц, подписка Pro расширяет лимиты.">
+      <div class="eco-node n-tasks" data-key="tasks" data-slogan="Задачи и исполнители — в одном окне" data-detail="Биржа для заказчиков и исполнителей: размещайте задачи, выбирайте исполнителя по рейтингу и отзывам, общайтесь во встроенном чате. Условно бесплатно — 1 заказ и 3 отклика в месяц, подписка Pro расширяет лимиты. Биржа работает в бета-режиме: режим заморозки денег (безопасная сделка) сейчас в разработке.">
         <div class="top"><span class="ico"><img src="img/tasks_icon.png" alt="" onerror="this.parentNode.textContent='📋'"></span><span class="nm">Биржа задач</span></div>
         <div class="desc">Задачи и исполнители — в одном месте.</div>
+        <div class="foot"><span class="eco-badge beta">Бета</span><button class="eco-cta">Скачать</button></div>
+      </div>
+      <div class="eco-node n-publisher" data-key="publisher" data-slogan="Один пост — все площадки" data-detail="Кросс-постинг в Telegram, ВКонтакте, Одноклассники, MAX, Instagram и WhatsApp: публикуйте сразу везде или по расписанию, смотрите живой превью под каждую площадку и пишите тексты с ИИ-помощником.">
+        <div class="top"><span class="ico"><img src="img/publisher_icon.png" alt="" onerror="this.parentNode.textContent='📡'"></span><span class="nm">Publisher</span></div>
+        <div class="desc">Публикуй сразу везде — один клик.</div>
         <div class="foot"><span class="eco-badge live">Работает</span><button class="eco-cta">Скачать</button></div>
       </div>
 
       <!-- СКОРО (плейсхолдеры-кружки, без выдуманных файлов) -->
-      <div class="eco-node is-soon n-publisher" data-key="publisher" data-slogan="Один пост — все площадки" data-detail="Готовим инструмент кросс-постинга в Telegram, VK, Instagram, MAX, Одноклассники, WhatsApp и Авито: публикуй сразу везде по расписанию, смотри превью под каждую сеть, используй ИИ для текстов. Скоро.">
-        <div class="top"><span class="ico"><img src="img/publisher_icon.png" alt="" onerror="this.parentNode.textContent='📡'"></span><span class="nm">Publisher</span></div>
-        <div class="desc">Публикуй сразу везде — один клик.</div>
-        <div class="foot"><span class="eco-badge soon">Скоро</span><button class="eco-cta ghost">Узнать первым</button></div>
-      </div>
       <div class="eco-node is-soon n-leads" data-key="leads" data-slogan="База клиентов за минуты" data-detail="Собираем сборщик контактов предприятий из 2ГИС: название, телефон, адрес — готовый список для обзвона или рассылки без ручного копирования. Скоро.">
         <div class="top"><span class="ico"><img src="img/leads_icon.png" alt="" onerror="this.parentNode.textContent='🎯'"></span><span class="nm">Leads</span></div>
         <div class="desc">База клиентов из 2ГИС — за минуты.</div>
@@ -640,7 +722,7 @@
           <div class="pm-note">под каждый инструмент</div>
         </div>
         <div class="pm-card reveal" style="transition-delay:.12s">
-          <div class="pm-name">Биржа</div>
+          <div class="pm-name">Биржа <span class="eco-badge beta">Бета</span></div>
           <div class="pm-price">Бесплатно</div>
           <div class="pm-note">Pro — больше лимитов</div>
         </div>
@@ -666,7 +748,7 @@
         <div class="trust-card reveal" style="transition-delay:.05s">
           <span class="tc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5 11 4v8H3zM13 3.7 21 2.5V12h-8zM3 12h8v8l-8-1.5zM13 12h8v9.5L13 20z"/></svg></span>
           <h4>Windows</h4>
-          <p>Скачал и запустил — без сложной установки.</p>
+          <p>Скачал, установил за минуту — и готово.</p>
         </div>
         <div class="trust-card reveal" style="transition-delay:.1s">
           <span class="tc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4 3 11l6 2 2 6 3-4 4 3 3-14z"/></svg></span>
@@ -675,8 +757,8 @@
         </div>
         <div class="trust-card reveal" style="transition-delay:.15s">
           <span class="tc-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4 3 6.5 7 9 4-2.5 7-5 7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></span>
-          <h4>Оплата за результат</h4>
-          <p>На бирже задач деньги удерживаются до выполнения.</p>
+          <h4>Рейтинг и отзывы</h4>
+          <p>На бирже исполнителя выбирают по реальному рейтингу и отзывам.</p>
         </div>
       </div>
     </div>
@@ -765,22 +847,109 @@
   <div id="tab-partner" class="tab-panel">
     <div class="sec-head reveal"><h2>Сотрудничество</h2><p>Растём вместе. Выберите формат партнёрства.</p></div>
     <div class="info-grid">
-      <div class="info-card reveal">
+      <!-- Кликабельная карточка → под-страница #tab-partner-program (роутер вкладок в main.js;
+           'partner-program' зарегистрирован в TAB_NAMES). Кабинет наполняет js/partner.js. -->
+      <a class="info-card reveal" href="#partner-program">
         <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="5" x2="5" y2="19"/><circle cx="7" cy="7" r="2.2"/><circle cx="17" cy="17" r="2.2"/></svg></span>
         <h3>Партнёрская программа</h3>
-        <p>Приводите пользователей по своей ссылке и получайте процент с их подписок.</p>
-      </div>
-      <div class="info-card reveal" style="transition-delay:.06s">
+        <p>Приводите пользователей по своей ссылке и получайте процент с их подписок — бессрочно.</p>
+        <span class="ic-cta">Подробнее →</span>
+      </a>
+      <!-- Кликабельная карточка → под-страница #tab-integrations (роутер вкладок в main.js
+           ловит нативный hashchange; 'integrations' зарегистрирован в TAB_NAMES). -->
+      <a class="info-card reveal" href="#integrations" style="transition-delay:.06s">
         <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6M15 3v6M6 9h12v3a6 6 0 0 1-12 0z"/><path d="M12 18v3"/></svg></span>
         <h3>Интеграции</h3>
-        <p>Хотите подключить свой сервис к экосистеме Vacantrix — обсудим API и условия.</p>
-      </div>
+        <p>Подключите свой сервис к экосистеме Vacantrix — единый аккаунт, события, биржа задач. Обсуждаем под вашу задачу.</p>
+        <span class="ic-cta">Подробнее →</span>
+      </a>
       <a class="info-card reveal" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener" style="transition-delay:.12s">
         <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>
         <h3>Связаться с нами</h3>
         <p>Расскажите о вашей идее — подберём формат под задачу.</p>
         <span class="ic-cta">Написать →</span>
       </a>
+    </div>
+  </div>
+
+  <!-- ── ИНТЕГРАЦИИ (под-страница карточки «Интеграции» из «Сотрудничество») ──
+       Навигируемый раздел, НЕ модалка. Открывается по #integrations (роутер вкладок
+       в main.js; 'integrations' зарегистрирован в TAB_NAMES). В топбар/нижнюю навигацию
+       НЕ добавлен намеренно — доступен только по клику с карточки и по прямой ссылке.
+       Переиспользует токены .ad-* / .info-card — без нового визуального языка. -->
+  <div id="tab-integrations" class="tab-panel">
+    <div class="integrations-page">
+      <a class="ad-back" href="#partner">← Назад к сотрудничеству</a>
+
+      <div class="ad-hero">
+        <span class="ad-hero-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3v6M15 3v6M6 9h12v3a6 6 0 0 1-12 0z"/><path d="M12 18v3"/></svg></span>
+        <div>
+          <span class="ad-status soon">В проработке</span>
+          <h2 class="ad-name">Интеграции</h2>
+          <p class="ad-tagline">Подключите свой сервис к экосистеме Vacantrix</p>
+        </div>
+      </div>
+
+      <section class="ad-section reveal">
+        <p>Интеграция — это связка вашего сервиса с Vacantrix: общий вход, обмен событиями
+        и работа с биржей задач без ручного переноса данных. Простыми словами — ваш продукт
+        и наши инструменты начинают понимать друг друга и работают как одно целое.</p>
+      </section>
+
+      <section class="ad-section reveal">
+        <h3>Что можно будет интегрировать</h3>
+        <div class="info-grid">
+          <div class="info-card">
+            <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>
+            <h3>Единый аккаунт</h3>
+            <p>Общий профиль экосистемы — пользователь входит одним аккаунтом и в наши инструменты, и в ваш сервис.</p>
+          </div>
+          <div class="info-card">
+            <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M10.5 21a2 2 0 0 0 3 0"/></svg></span>
+            <h3>Уведомления о событиях</h3>
+            <p>Отклики, статусы задач и другие события экосистемы могут приходить прямо в ваш сервис.</p>
+          </div>
+          <div class="info-card">
+            <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></span>
+            <h3>Биржа задач</h3>
+            <p>Приём и публикация задач из вашего сервиса — заказы попадают исполнителям Vacantrix.</p>
+          </div>
+          <div class="info-card">
+            <span class="ic-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7L12 19"/></svg></span>
+            <h3>Партнёрский трафик</h3>
+            <p>Связка с реферальной программой — собственный промокод или ссылка для ваших пользователей.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="ad-section reveal">
+        <h3>Как это работает</h3>
+        <ol class="ad-steps">
+          <li>Оставляете заявку и описываете задачу — что за сервис и зачем нужна связка.</li>
+          <li>Обсуждаем сценарий, объём и условия — подбираем формат под ваш случай.</li>
+          <li>Подключаем под вашу задачу — настраиваем и проверяем интеграцию вместе.</li>
+        </ol>
+      </section>
+
+      <p class="integrations-note reveal">Публичного API у Vacantrix пока нет — интеграции
+      обсуждаем индивидуально под каждый кейс. Расскажите о задаче, и мы предложим рабочий формат.</p>
+
+      <div class="integrations-cta reveal">
+        <a class="ad-cta" href="https://t.me/VacantrixB_O_T" target="_blank" rel="noopener">Обсудить интеграцию</a>
+        <p class="integrations-cta-alt">или напишите на <a href="mailto:support@vacantrix.app">support@vacantrix.app</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ПАРТНЁРСКАЯ ПРОГРАММА (под-страница карточки из «Сотрудничество») ──
+       Навигируемый раздел #partner-program (роутер вкладок в main.js; зарегистрирован
+       в TAB_NAMES). В топбар НЕ добавлен — доступен по клику с карточки и прямой ссылке.
+       Кабинет (3 состояния: гость / вошёл-не-партнёр / партнёр) наполняет js/partner.js
+       в #partner-content. -->
+  <div id="tab-partner-program" class="tab-panel">
+    <div class="partner-page">
+      <a class="ad-back" href="#partner">← Назад к сотрудничеству</a>
+      <div id="partner-content"><div class="spinner"></div></div>
     </div>
   </div>
 </div>
@@ -952,6 +1121,32 @@
   </span>
 </div>
 
+<!-- ════ Мобильная нижняя навигация (видна ≤760px; стили — в <style> головы) ════
+     Дублирует вкладки топбара, которые на телефоне не помещаются. Кнопки — те же
+     .tab-btn[data-tab] (main.js биндит их делегированием). «Главная» — по логотипу. -->
+<nav class="mnav" aria-label="Разделы сайта">
+  <button class="mnav-btn tab-btn" data-tab="apps">
+    <span class="mnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7.5" height="7.5" rx="2.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2.2"/></svg></span>
+    <span class="mnav-lbl">Приложения</span>
+  </button>
+  <button class="mnav-btn tab-btn" data-tab="pricing">
+    <span class="mnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.3" cy="7.3" r="1.4" fill="currentColor" stroke="none"/></svg></span>
+    <span class="mnav-lbl">Тарифы</span>
+  </button>
+  <button class="mnav-btn tab-btn" data-tab="about">
+    <span class="mnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.2"/><line x1="12" y1="11" x2="12" y2="16.5"/><circle cx="12" cy="7.4" r="1.1" fill="currentColor" stroke="none"/></svg></span>
+    <span class="mnav-lbl">О нас</span>
+  </button>
+  <button class="mnav-btn tab-btn" data-tab="support">
+    <span class="mnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13.5v-1.5a8 8 0 0 1 16 0v1.5"/><rect x="2.4" y="13" width="4" height="7" rx="2"/><rect x="17.6" y="13" width="4" height="7" rx="2"/><path d="M20 19.6a4.6 4.6 0 0 1-4.6 3.2H13"/></svg></span>
+    <span class="mnav-lbl">Поддержка</span>
+  </button>
+  <button class="mnav-btn tab-btn" data-tab="partner">
+    <span class="mnav-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="5.4"/><circle cx="15" cy="12" r="5.4"/></svg></span>
+    <span class="mnav-lbl">Партнёрам</span>
+  </button>
+</nav>
+
 <!-- ── Подвал ───────────────────────────────────────────────────────── -->
 <footer class="site-footer" style="text-align:center; padding:28px 16px; color:#6b7590; font-size:13px; border-top:1px solid rgba(255,255,255,.06); position:relative; z-index:1;">
   <div style="display:flex; flex-wrap:wrap; gap:6px 8px; justify-content:center; align-items:center; max-width:760px; margin:0 auto;">
@@ -964,6 +1159,8 @@
     <a href="payment.html" style="color:#8893b0; text-decoration:none;">Оплата и возврат</a>
     <span>·</span>
     <a href="requisites.html" style="color:#8893b0; text-decoration:none;">Реквизиты</a>
+    <span>·</span>
+    <a href="partner-offer.html" style="color:#8893b0; text-decoration:none;">Партнёрская программа</a>
     <span>·</span>
     <span>© Vacantrix</span>
   </div>
@@ -982,9 +1179,9 @@
     // только при включении 3D — в 2D Three.js не качается вовсе.
     // appdata.js — ПЕРВЫМ среди потребителей (apps.js/pricing.js/appdetail.js
     // читают window.APP_DATA / window.APP_KEY_BY_SLUG). pricing.js до appdetail.js.
-    var files = ['js/config.js', 'js/auth.js', 'js/profile.js',
+    var files = ['js/config.js', 'js/referral.js', 'js/auth.js', 'js/profile.js',
                  'js/platforms.js', 'js/appdata.js', 'js/apps.js',
-                 'js/pricing.js', 'js/appdetail.js', 'js/main.js',
+                 'js/pricing.js', 'js/appdetail.js', 'js/main.js', 'js/partner.js',
                  'js/scrollfx.js', 'js/format.js'];
     for (var i = 0; i < files.length; i++) {
       document.write('<script src="' + files[i] + '?v=' + v + '"><\/script>');

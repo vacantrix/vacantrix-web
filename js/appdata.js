@@ -138,11 +138,13 @@ const APP_DATA = {
 
   tasks: {
     key: 'tasks', status: 'live', toolSlug: 'tasks',
+    beta: true,
+    betaNote: 'Биржа работает в бета-режиме. Режим заморозки денег (безопасная сделка) сейчас в разработке — появится позже. Уже доступно: размещение задач, отклики, встроенный чат и рейтинг.',
     name: 'Vacantrix Биржа',
-    tagline: 'Задачи и исполнители — в одном окне',
+    tagline: 'Задачи и исполнители — в одном окне · бета',
     icon: 'img/tasks_icon.png', emoji: '📋',
     video: 'img/promo/tasks.mp4', poster: 'img/promo/tasks_poster.jpg',
-    screenshots: ['img/screens/deal_mode.png', 'img/screens/deal_pay.png', 'img/screens/terms.png'],
+    screenshots: [],
     surfaces: 'Встроенная платформа Vacantrix — внешние сервисы не нужны',
     whatis: 'Десктоп-платформа для размещения задач и поиска исполнителей. Заказчик публикует задачу с описанием и бюджетом, исполнители откликаются, заказчик выбирает подходящего и подтверждает результат. Встроенный чат, статусы задачи и рейтинги — всё общение и история в одном месте.',
     how: [
