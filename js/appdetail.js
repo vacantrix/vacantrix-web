@@ -222,6 +222,7 @@ const AppDetail = (() => {
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
     panel.classList.add('active');
+    document.body.classList.add('appdetail-open');   // 3D: панель справа, планета слева (CSS)
     _openKey = key;
     try { window.scrollTo(0, 0); } catch (e) {}
     if (window._initReveal) window._initReveal();
@@ -230,6 +231,7 @@ const AppDetail = (() => {
   // ── Вернуть обычную вкладку (после выхода из раздела) ──────────────────
   // Фолбек _returnTab='apps' (каталог) для прямого захода по ссылке.
   function _restoreTab() {
+    document.body.classList.remove('appdetail-open');
     const tab = _returnTab || 'apps';
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -300,6 +302,7 @@ const AppDetail = (() => {
   // только убираем хэш и прячем #tab-app.
   function clearRoute() {
     if (_routeKey() === null && _openKey === null) return;   // не на app-роуте — нечего чистить
+    document.body.classList.remove('appdetail-open');
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     const panel = document.getElementById('tab-app');
     if (panel) { panel.classList.remove('active'); panel.innerHTML = ''; }

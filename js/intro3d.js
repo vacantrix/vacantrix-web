@@ -151,7 +151,10 @@ export function start(opts) {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   } catch (e) { settleStatic(); return false; }              // WebGL недоступен → 2D
   renderer.setClearColor(0x020105, 1);                 // тёмный космос (почти чёрный)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  // Когда поверх сцены открыт раздел приложения (#app/<key>) — облегчаем фон:
+  // ниже DPR + пропуск bloom во frame → панель справа не лагает, планета слева жива.
+  let DPR_CAP = 2, appView = false;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 0.95;                 // чуть светлее → лак/металл читаются ярче
   const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
@@ -641,7 +644,7 @@ export function start(opts) {
   }
   function onResize() {
     const w = window.innerWidth, h = window.innerHeight;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, DPR_CAP));
     // updateStyle=true (по умолчанию): Three сам ставит CSS-размер канваса = вьюпорт.
     // Иначе при zoom-out (devicePixelRatio<1) канвас схлопывается влево — сцена уезжает.
     renderer.setSize(w, h);
@@ -1029,7 +1032,8 @@ export function start(opts) {
       if (selRing.material.opacity <= 0.02) selRing.visible = false;
     }
 
-    composer.render();
+    if (appView) renderer.render(scene, camera);        // раздел приложения открыт → дёшево (без bloom)
+    else composer.render();
 
     // Карточка следует за планетой (после render — матрицы свежие).
     if (hovered && phase === 'idle') positionCard(hovered);
@@ -1045,6 +1049,16 @@ export function start(opts) {
   function onVisibility() {
     if (document.hidden) { paused = true; cancelAnimationFrame(raf); }
     else if (paused) { paused = false; last = 0; if (running) raf = requestAnimationFrame(frame); }
+  }
+
+  // Открыт раздел приложения (#app/<key>) → сцена уходит в дешёвый фон: DPR=1 и без
+  // bloom (см. frame). Любой другой хэш → полное качество. Снимается через detach.
+  function onHashView() {
+    const a = /^#app\//.test(location.hash || '');
+    if (a === appView) return;
+    appView = a;
+    DPR_CAP = a ? 1 : 2;
+    onResize();                                         // применяет новый DPR ко всем буферам
   }
 
   // ── Подцепка/снятие ВСЕХ слушателей (pause/resume/dispose) ─────────────
@@ -1066,10 +1080,12 @@ export function start(opts) {
     on(window, 'touchcancel', onTouchEnd, { passive: true });
     on(window, 'click', onClick);
     on(document, 'visibilitychange', onVisibility);
+    on(window, 'hashchange', onHashView);
     if (skip) on(skip, 'click', skipIntro);
     const bar = document.querySelector('.topbar');
     if (bar) on(bar, 'click', skipIntro, true);
     on(document, 'keydown', onKey);
+    onHashView();                                      // синхронизировать состояние при подцепке
   }
   function detach() {
     if (!_attached) return;

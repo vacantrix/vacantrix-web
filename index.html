@@ -254,6 +254,32 @@
      добавляем mode-3d для переходного/fallback-кадра, чтобы канвас не просвечивал. */
   body.mode-3d #tab-app { background: var(--bg); }
 
+  /* 3D + открыт раздел приложения: панель уезжает ВПРАВО, слева видна живая сцена
+     (планета). Подложка панели почти непрозрачна и БЕЗ backdrop-blur — иначе блюр
+     движущегося 3D-фона сам бы лагал. Та же специфичность, что у full-bleed-правила
+     выше, но ниже по исходнику → перекрывает. На узких экранах — нижний лист. */
+  body.mode-3d.appdetail-open #tab-app {
+    background: transparent; padding: 0; min-height: 100vh;
+    display: flex; justify-content: flex-end; align-items: stretch;
+    pointer-events: none;                 /* пустая левая зона пропускает клики к сцене */
+  }
+  body.mode-3d.appdetail-open #tab-app .app-detail-panel {
+    pointer-events: auto; margin: 0; max-width: none;
+    width: min(560px, 94vw); max-height: 100vh; overflow-y: auto; overscroll-behavior: contain;
+    background: rgba(11, 10, 15, .94); border-left: 1px solid var(--border);
+    box-shadow: -26px 0 64px -22px rgba(0,0,0,.85); padding: 24px 26px 56px;
+  }
+  body.mode-3d.appdetail-open .app-detail-grid { grid-template-columns: 1fr; }
+  body.mode-3d.appdetail-open .ad-rail { position: static; flex-direction: column; }
+  @media (max-width: 760px) {
+    body.mode-3d.appdetail-open #tab-app { display: block; }
+    body.mode-3d.appdetail-open #tab-app .app-detail-panel {
+      width: 100%; margin-top: 32vh; max-height: 68vh;
+      border-left: none; border-top: 1px solid var(--border); border-radius: 18px 18px 0 0;
+      box-shadow: 0 -22px 60px -20px rgba(0,0,0,.85);
+    }
+  }
+
   /* 2D: сетка продуктов вместо радиальной раскладки */
   body:not(.mode-3d) .eco-stage {
     position: static; height: auto; max-width: 1080px; margin: 26px auto 0;
