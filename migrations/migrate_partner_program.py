@@ -323,14 +323,16 @@ MIGRATIONS: list[tuple[str, str]] = [
             v_uid       uuid := auth.uid();
             v_pid       uuid;
             v_se        boolean;
+            v_status    text;
             v_min       numeric;
             v_available numeric;
             v_row       public.partner_payouts;
         BEGIN
             IF v_uid IS NULL THEN RAISE EXCEPTION 'auth required'; END IF;
-            SELECT id, self_employed_confirmed INTO v_pid, v_se
+            SELECT id, self_employed_confirmed, status INTO v_pid, v_se, v_status
             FROM public.partners WHERE web_user_id = v_uid;
             IF v_pid IS NULL THEN RAISE EXCEPTION 'not a partner'; END IF;
+            IF v_status <> 'active' THEN RAISE EXCEPTION 'partner blocked'; END IF;
             IF NOT v_se THEN RAISE EXCEPTION 'self-employed status required'; END IF;
 
             SELECT min_payout_rub INTO v_min FROM public.partner_settings WHERE id = 1;
@@ -420,7 +422,13 @@ MIGRATIONS: list[tuple[str, str]] = [
             v_partner_id uuid;
             v_rate       numeric;
         BEGIN
-            SELECT partner_id INTO v_partner_id FROM public.referrals WHERE referred_user_id = p_user_id;
+            -- мусорная/отрицательная сумма комиссию не создаёт
+            IF p_paid_amount IS NULL OR p_paid_amount <= 0 THEN RETURN; END IF;
+            -- начисляем только АКТИВНОМУ партнёру (заблокированный не зарабатывает)
+            SELECT r.partner_id INTO v_partner_id
+            FROM public.referrals r
+            JOIN public.partners p ON p.id = r.partner_id
+            WHERE r.referred_user_id = p_user_id AND p.status = 'active';
             IF v_partner_id IS NULL THEN RETURN; END IF;
             SELECT rate INTO v_rate FROM public.partner_settings WHERE id = 1;
 
