@@ -20,7 +20,6 @@
      • скип по кнопке / Escape / клику по верхней панели прерывает интро.
    ===================================================================== */
 import * as THREE from 'three';
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -168,7 +167,29 @@ export function start(opts) {
 
   // отражения окружения — ключ к «премиум»-материалам (стекло/металл/лак)
   const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.03).texture;
+  // Окружение для отражений = ПРОЦЕДУРНЫЙ космос (тёмная база + цветные туманные пятна +
+  // редкие звёзды), а не комната → металл/лак планет отражает космос. Без ассетов.
+  const _spaceEnv = (function () {
+    const W = 512, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d');
+    g.fillStyle = '#02030a'; g.fillRect(0, 0, W, H);
+    g.globalCompositeOperation = 'lighter';
+    for (const [col, rad] of [['#1a1230', 70], ['#08222e', 60], ['#2a0a18', 50]]) {
+      for (let k = 0; k < 5; k++) {
+        const x = Math.random() * W, y = Math.random() * H, r = rad * (0.5 + Math.random());
+        const grd = g.createRadialGradient(x, y, 0, x, y, r);
+        grd.addColorStop(0, col); grd.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grd; g.fillRect(0, 0, W, H);
+      }
+    }
+    g.fillStyle = '#fff';
+    for (let i = 0; i < 150; i++) { g.globalAlpha = 0.25 + Math.random() * 0.7; g.fillRect(Math.random() * W, Math.random() * H, Math.random() * 1.6, Math.random() * 1.6); }
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  })();
+  scene.environment = pmrem.fromEquirectangular(_spaceEnv).texture;
+  _spaceEnv.dispose();
 
   scene.add(new THREE.AmbientLight(0x404058, 0.42));
   const corePoint = new THREE.PointLight(ACCENT, 3.0, 90);
@@ -594,28 +615,76 @@ export function start(opts) {
     );
   }
 
-  // ── Глубинная пыль ────────────────────────────────────────────────────
-  const DUST = 520;
-  const dustGeo = new THREE.BufferGeometry();
-  const dustPos = new Float32Array(DUST * 3);
-  for (let i = 0; i < DUST; i++) {
-    const r = 10 + Math.random() * 34, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
-    dustPos[i * 3]     = r * Math.sin(ph) * Math.cos(th);
-    dustPos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th) * 0.6;
-    dustPos[i * 3 + 2] = r * Math.cos(ph);
+  // ── Звёздное небо: 3 слоя точек с цветовой температурой + мерцанием ──────
+  // Дальний слой мелкий/тусклый, ближний крупнее → параллакс при вращении мира.
+  // Круглые мягкие точки (shader), цвет звезды = вес к холодным/белым.
+  const starMat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 }, uPix: { value: renderer.getPixelRatio() } },
+    vertexShader: `
+      attribute float aSize; attribute vec3 aColor;
+      uniform float uTime; uniform float uPix;
+      varying vec3 vC; varying float vTw;
+      void main(){
+        vC = aColor;
+        float ph = aSize * 53.0 + position.x * 0.7 + position.y * 1.3;
+        vTw = 0.72 + 0.28 * sin(uTime * 1.7 + ph);            // мерцание
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = min(48.0, aSize * uPix * (260.0 / -mv.z));   // attenuation по глубине + clamp
+      }`,
+    fragmentShader: `
+      varying vec3 vC; varying float vTw;
+      void main(){
+        vec2 d = gl_PointCoord - vec2(0.5);
+        float r2 = dot(d, d);
+        if (r2 > 0.25) discard;
+        float a = smoothstep(0.25, 0.0, r2);                  // круглая мягкая точка
+        gl_FragColor = vec4(vC * vTw, a);
+      }`,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const STAR_TEMP = [
+    [0.62, 0.74, 1.0], [0.85, 0.90, 1.0], [1.0, 1.0, 1.0],
+    [1.0, 0.96, 0.86], [1.0, 0.84, 0.62], [1.0, 0.70, 0.50],
+  ];
+  function starLayer(count, rMin, rMax, sizeBase, sizeJit, bright) {
+    const pos = new Float32Array(count * 3), col = new Float32Array(count * 3), siz = new Float32Array(count);
+    for (let i = 0; i < count; i++) {
+      const r = rMin + Math.random() * (rMax - rMin);
+      const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+      pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+      pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th);
+      pos[i * 3 + 2] = r * Math.cos(ph);
+      const u = Math.random();
+      let ti = u < 0.50 ? 1 : u < 0.78 ? 2 : u < 0.90 ? 3 : u < 0.97 ? 4 : 5;
+      if (Math.random() < 0.12) ti = 0;                        // редкие голубые
+      const c = STAR_TEMP[ti], b = bright * (0.5 + Math.random() * 0.7);
+      col[i * 3] = c[0] * b; col[i * 3 + 1] = c[1] * b; col[i * 3 + 2] = c[2] * b;
+      siz[i] = sizeBase + Math.random() * sizeJit;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
+    return new THREE.Points(g, starMat);
   }
-  dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
-  const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({
-    color: 0xb9a9d6, size: 0.07, transparent: true, opacity: 0.5,
-    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
-  }));
-  world.add(dust);
+  const starField = new THREE.Group();
+  starField.add(starLayer(2600, 90, 150, 1.2, 1.0, 0.70));    // дальний фон
+  starField.add(starLayer(1500, 50,  90, 1.8, 1.6, 0.95));    // средний
+  starField.add(starLayer(220,  40,  62, 2.6, 2.6, 1.45));    // ближние яркие (блумят)
+  world.add(starField);
 
   // Мягкое центральное свечение: насыщает центр и плавно гаснет к краям —
   // заполняет простор на широких экранах, чтобы края «сцены» не были пустыми.
-  const nebula = glowSprite(0x3a0c14, 24, 0.06);
-  nebula.position.set(0, 0, -7);
-  world.add(nebula);
+  // Слоистая цветная туманность (глубокий синий / тил / тёмно-красный намёк на бренд) —
+  // асимметрично, приглушённо: даёт «дымку» и цвет космосу, не перебивая красный акцент.
+  [[0x241a3a, 26, 0.055, -6, 2, -9], [0x0d2a3a, 22, 0.05, 7, -3, -8], [0x3a0c1e, 20, 0.045, 0, 0, -7]]
+    .forEach(([c, s, o, x, y, z]) => {
+      const sp = glowSprite(c, s, o, nebulaTex);
+      sp.position.set(x, y, z);
+      sp.material.rotation = Math.random() * 6.2831853;
+      world.add(sp);
+    });
 
   // ── 3D-выделение: ЯРКО-красная неоновая линия — тонкое яркое ядро + тугое
   //    свечение по самой линии (узкая «неон-трубка», без широкого ореола). ──
@@ -799,7 +868,8 @@ export function start(opts) {
     if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
     const picked = pickAt(e.clientX, e.clientY);
     if (picked) {
-      focusTarget = picked; appView = true;            // зум к планете + пульс швов («как было»)
+      appView = true;                                  // панель открыта (вкл. лёгкий фон у Platform)
+      if (picked !== coreEntry) focusTarget = picked;  // зум+пульс — у продуктов; у ядра НЕТ приближения
       if (window.AppDetail && window.AppDetail.open) window.AppDetail.open(picked.key);
     }
   }
@@ -1015,7 +1085,8 @@ export function start(opts) {
       }
     }
 
-    dust.rotation.y += dt * 0.012;
+    starField.rotation.y += dt * 0.003;                 // медленный дрейф неба
+    starMat.uniforms.uTime.value = tsec;                // мерцание звёзд
 
     // Скин-схема: у наведённой планеты «просыпается» неоновая электросхема (волной),
     // крутится вместе с планетой; у остальных — гаснет.
@@ -1046,7 +1117,8 @@ export function start(opts) {
       if (selRing.material.opacity <= 0.02) selRing.visible = false;
     }
 
-    composer.render();
+    if (appView && !focusRef) renderer.render(scene, camera);   // карточка Platform (панель без фокуса) → дёшево, без bloom
+    else composer.render();
 
     // Карточка следует за планетой (после render — матрицы свежие).
     if (hovered && phase === 'idle') positionCard(hovered);
@@ -1072,7 +1144,7 @@ export function start(opts) {
     if (!m) { focusTarget = null; return; }             // ушли из раздела → камера домой
     if (!focusTarget) {                                  // прямой заход по ссылке (без клика)
       let key; try { key = decodeURIComponent(m[1]); } catch (e) { key = m[1]; }
-      focusTarget = hoverables.find(h => h.key === key) || null;
+      if (key !== 'platform') focusTarget = hoverables.find(h => h.key === key) || null;  // ядро — без зума
     }
   }
 
