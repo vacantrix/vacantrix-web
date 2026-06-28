@@ -1,42 +1,43 @@
 /* =====================================================================
-   intro3d.js — 3D-экосистема Vacantrix на Three.js: кинематографичное
-   интро + ПОСТОЯННЫЙ живой фон.
+   intro3d.js — 3D-сцена Vacantrix на Three.js: «Материнская плата / хаб».
 
-   Планеты-продукты «одеты» в наши иконки (скин: текстура иконки на глянцевой
-   сфере + emissive-свечение красных линий + атмосфера), вращаются вокруг своей
-   оси и летят по 3D-орбитам вокруг светящегося ядра (Vacantrix Platform).
+   Концепт B (мейнфрейм-хаб):
+     • НАКЛОНЁННАЯ материнская плата (тёмный гетинакс + красные трейсы) парит в
+       тёмной техно-пустоте — это «Платформа»-хаб (буквально board).
+     • CPU-ЯДРО (Vacantrix Platform) в ЦЕНТРЕ — приподнятый ступенчатый чип,
+       КРУПНЫЙ и ЯРКИЙ (красный emissive + bloom). Самый высокий элемент = хаб.
+     • 7 инструментов = ЧИПЫ в слотах вокруг CPU: приподнятые боксы с иконкой на
+       верхней грани и свечением рамки в брендовом цвете.
+     • Дорожки-трейсы от каждого чипа К CPU с бегущим красным ТОКОМ — всё сходится
+       к центру: «всё подключено к платформе».
 
-   Жизненный цикл:
-     1) ИНТРО поверх чёрной вуали: ядро зажигается, импульсы добегают до планет
-        и проявляют реальные HTML-карточки (.eco-node.shown).
-     2) ОСАЖДЕНИЕ: вуаль поднимается, контент показывается, а канвас НЕ гаснет —
-        уходит на задний план (z-index 0) и продолжает жить: орбиты + самовращение
-        + параллакс от курсора. Сцена остаётся фоном страницы навсегда.
+   Жизненный цикл (без изменений — функциональный контракт):
+     1) ИНТРО: CPU зажигается → ток бежит по дорожкам наружу → чипы проявляются
+        (revealKey/revealCore поднимают реальные HTML-плитки .eco-node.shown).
+     2) ОСАЖДЕНИЕ: вуаль поднимается, канвас уходит в фон (z-index 0) и живёт
+        как параллакс-фон. Сцена остаётся фоном страницы.
 
    Бережно:
-     • prefers-reduced-motion → сразу финал, фон выключен (уважаем настройку);
+     • prefers-reduced-motion → сразу финал, фон выключен;
      • нет WebGL / нет канваса → graceful fallback (контент виден, канвас скрыт);
-     • вкладка скрыта → рендер на паузе (экономим GPU);
+     • вкладка скрыта → рендер на паузе;
      • скип по кнопке / Escape / клику по верхней панели прерывает интро.
    ===================================================================== */
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
-import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
-import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 // ─────────────────────────────────────────────────────────────────────
 // Управляемый ES-модуль. Никакого самозапуска: контроллер формата
 // (js/format.js) ленивым импортом дёргает start()/pause()/resume()/dispose().
-// Сцена (renderer/scene/планеты/пыль/listeners) аллоцируется ТОЛЬКО в start();
-// чистые константы/хелперы и чтение DOM-данных карточек — в module-scope.
+// Сцена аллоцируется ТОЛЬКО в start(); чистые константы/хелперы и чтение DOM-
+// данных карточек — в module-scope (нужны и на fallback-пути).
 // ─────────────────────────────────────────────────────────────────────
 
-// Порядок раскрытия карточек = порядок прихода импульсов к планетам.
+// Порядок раскрытия карточек = порядок прихода тока к чипам.
 const KEYS = ['hh', 'avito', 'tasks', 'publisher', 'leads', 'monitor', 'analytics'];
-// Брендовые цвета планет (свечение/атмосфера) — тёплые + холодные.
+// Брендовые цвета чипов (свечение рамки/слота).
 const NODE_COLORS = {
   hh: 0xff5a67, avito: 0x4fd0ff, tasks: 0x68e6a0, publisher: 0xff7a86,
   leads: 0xff9e57, monitor: 0x5ad1ff, analytics: 0xffd166,
@@ -47,7 +48,9 @@ const ICON = {
   tasks: 'img/tasks_icon.png' + IMG_V, publisher: 'img/publisher_icon.png' + IMG_V, leads: 'img/leads_icon.png' + IMG_V,
   monitor: 'img/monitor_icon.png' + IMG_V, analytics: 'img/analytics_icon.png' + IMG_V,
 };
-const ACCENT = 0xe63946;
+const ACCENT = 0xe63946;                             // ЕДИНСТВЕННЫЙ источник красного хекса в JS
+const _AR = (ACCENT >> 16) & 255, _AG = (ACCENT >> 8) & 255, _AB = ACCENT & 255;
+const accRGBA = (a) => 'rgba(' + _AR + ',' + _AG + ',' + _AB + ',' + a + ')';
 
 const lerp = (a, b, t) => a + (b - a) * t;
 const clampv = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -56,7 +59,6 @@ let reduce = false;
 try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
 
 // ── Раскрытие DOM-карточек (контракт со старым intro) ─────────────────
-// Module-scope: сами читают актуальный DOM — нужны и на fallback-пути, и в кадре.
 function revealCore() {
   const stage = document.getElementById('eco-stage');
   const coreEl = stage ? stage.querySelector('.eco-core') : null;
@@ -109,8 +111,8 @@ function cardData(key) {
       name,
       sub: small ? small.textContent.trim() : '',
       desc: (descEl ? descEl.textContent : (small ? small.textContent : '')).trim(),
-      detail: (el.getAttribute('data-detail') || '').trim(),     // длинное описание (карточка детали)
-      slogan: (el.getAttribute('data-slogan') || '').trim(),     // слоган
+      detail: (el.getAttribute('data-detail') || '').trim(),
+      slogan: (el.getAttribute('data-slogan') || '').trim(),
       live: badgeEl ? badgeEl.classList.contains('live') : true,
       beta: badgeEl ? badgeEl.classList.contains('beta') : false,
       badge: badgeEl ? badgeEl.textContent.trim() : (key === 'platform' ? 'Ядро' : ''),
@@ -125,13 +127,11 @@ function cardData(key) {
 let started = false;     // сцена построена?
 let _api = null;         // { pause, resume, dispose } — замыкания живой сцены
 
-// Управление сценой из контроллера формата:
 export function pause()   { if (_api) _api.pause(); }
 export function resume()  { if (!started) return start(); return _api ? _api.resume() : false; }
 export function dispose() { if (_api) _api.dispose(); }
 
 // start(opts) → true (сцена запущена) | false (провал → контроллер откатывается в 2D).
-// Провал = нет #intro-canvas/#eco-stage, prefers-reduced-motion или WebGL недоступен.
 export function start(opts) {
   if (started) return resume();                              // идемпотентность: повторный start = resume
 
@@ -149,14 +149,11 @@ export function start(opts) {
   try {
     renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
   } catch (e) { settleStatic(); return false; }              // WebGL недоступен → 2D
-  renderer.setClearColor(0x020105, 1);                 // тёмный космос (почти чёрный)
-  // Открыт раздел приложения (#app/<key>): камера фокус-зумится на планете и смещает
-  // её из-под правой панели (см. focusRef-блок и onHashView). Фокус схлопывает прочие
-  // планеты в 0 → сцена становится лёгкой (одна планета) — заодно снимает лаг панели.
-  let appView = false;
+  renderer.setClearColor(0x04060a, 1);                 // тёмная техно-пустота
+  let appView = false;                                 // открыт раздел #app/<key> → фокус-зум на чип
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.95;                 // чуть светлее → лак/металл читаются ярче
+  renderer.toneMappingExposure = 0.98;
   const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
   document.body.classList.add('planets-on');           // 3D активна → плитки eco-stage скрыты
 
@@ -165,49 +162,45 @@ export function start(opts) {
   const world = new THREE.Group();
   scene.add(world);
 
-  // отражения окружения — ключ к «премиум»-материалам (стекло/металл/лак)
+  // отражения окружения — тёмный техно-env (металл чипов/CPU отражает «студию»)
   const pmrem = new THREE.PMREMGenerator(renderer);
-  // Окружение для отражений = ПРОЦЕДУРНЫЙ космос (тёмная база + цветные туманные пятна +
-  // редкие звёзды), а не комната → металл/лак планет отражает космос. Без ассетов.
-  const _spaceEnv = (function () {
+  const _techEnv = (function () {
     const W = 512, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d');
-    g.fillStyle = '#02030a'; g.fillRect(0, 0, W, H);
+    g.fillStyle = '#05070c'; g.fillRect(0, 0, W, H);
     g.globalCompositeOperation = 'lighter';
-    for (const [col, rad] of [['#1a1230', 70], ['#08222e', 60], ['#2a0a18', 50]]) {
-      for (let k = 0; k < 5; k++) {
-        const x = Math.random() * W, y = Math.random() * H, r = rad * (0.5 + Math.random());
+    for (const [col, rad] of [['#10131f', 80], ['#0c1a22', 60], [accRGBA(0.18), 46]]) {
+      for (let k = 0; k < 4; k++) {
+        const x = Math.random() * W, y = Math.random() * H, r = rad * (0.6 + Math.random());
         const grd = g.createRadialGradient(x, y, 0, x, y, r);
         grd.addColorStop(0, col); grd.addColorStop(1, 'rgba(0,0,0,0)');
         g.fillStyle = grd; g.fillRect(0, 0, W, H);
       }
     }
-    g.fillStyle = '#fff';
-    for (let i = 0; i < 150; i++) { g.globalAlpha = 0.25 + Math.random() * 0.7; g.fillRect(Math.random() * W, Math.random() * H, Math.random() * 1.6, Math.random() * 1.6); }
-    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    g.globalCompositeOperation = 'source-over';
     const t = new THREE.CanvasTexture(c); t.mapping = THREE.EquirectangularReflectionMapping; t.colorSpace = THREE.SRGBColorSpace;
     return t;
   })();
-  scene.environment = pmrem.fromEquirectangular(_spaceEnv).texture;
-  _spaceEnv.dispose();
+  scene.environment = pmrem.fromEquirectangular(_techEnv).texture;
+  _techEnv.dispose();
 
-  scene.add(new THREE.AmbientLight(0x404058, 0.42));
+  scene.add(new THREE.AmbientLight(0x3a4055, 0.5));
   const corePoint = new THREE.PointLight(ACCENT, 3.0, 90);
   scene.add(corePoint);
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.35);
-  keyLight.position.set(4, 5, 7);
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.25);
+  keyLight.position.set(3, 7, 6);
   scene.add(keyLight);
-  const rimLight = new THREE.DirectionalLight(0xff4858, 0.8);
-  rimLight.position.set(-6, -1, -3);
+  const rimLight = new THREE.DirectionalLight(0xff4858, 0.7);
+  rimLight.position.set(-5, 2, -4);
   scene.add(rimLight);
 
-  // bloom-постобработка (свечение ядер/неона)
+  // bloom-постобработка (CPU-ядро + ток по дорожкам светятся)
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.6, 0.5, 0.18);
+  const bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), 0.62, 0.5, 0.18);
   composer.addPass(bloomPass);
 
-  // Радиальный glow-спрайт (общая текстура) ──────────────────────────────
+  // ── Радиальный glow-спрайт (общая текстура) ───────────────────────────
   const glowTex = (function () {
     const c = document.createElement('canvas'); c.width = c.height = 128;
     const g = c.getContext('2d');
@@ -218,85 +211,42 @@ export function start(opts) {
     g.fillStyle = grd; g.fillRect(0, 0, 128, 128);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
-  function glowSprite(color, scale, opacity, tex) {
+  function glowSprite(color, scale, opacity) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: tex || glowTex, color, blending: THREE.AdditiveBlending,
+      map: glowTex, color, blending: THREE.AdditiveBlending,
       transparent: true, depthWrite: false, opacity: opacity == null ? 0.9 : opacity,
     }));
     s.scale.setScalar(scale);
     return s;
   }
 
-  // Процедурная «туманность»: много мягких клочков-сгустков (additive) + затухание
-  // к краям → клочковатое, живое свечение вместо ровного круга.
-  const nebulaTex = (function () {
-    const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
+  // ── Поток энергии (бегущий красный ток в дорожках) ────────────────────
+  // Почти чёрно-красная база + бегущие яркие импульсы (анимируем offset.y).
+  const energyTex = (function () {
+    const W = 8, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d');
-    g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
-    g.globalCompositeOperation = 'lighter';
-    const cx = S / 2, cy = S / 2;
-    for (let i = 0; i < 30; i++) {
-      const ang = Math.random() * 6.2831853;
-      const dist = Math.pow(Math.random(), 0.7) * S * 0.34;     // сгущение к центру
-      const x = cx + Math.cos(ang) * dist, y = cy + Math.sin(ang) * dist;
-      const r = S * (0.05 + Math.random() * 0.17);
-      const a = 0.05 + Math.random() * 0.13;
-      const grd = g.createRadialGradient(x, y, 0, x, y, r);
-      grd.addColorStop(0, 'rgba(255,255,255,' + a.toFixed(3) + ')');
-      grd.addColorStop(1, 'rgba(255,255,255,0)');
-      g.fillStyle = grd; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    g.fillStyle = '#120307'; g.fillRect(0, 0, W, H);
+    for (let i = 0; i < 3; i++) {
+      const y = (i + 0.5) / 3 * H, r = H * 0.16;
+      const grd = g.createLinearGradient(0, y - r, 0, y + r);
+      grd.addColorStop(0, accRGBA(0)); grd.addColorStop(0.5, accRGBA(1)); grd.addColorStop(1, accRGBA(0));
+      g.fillStyle = grd; g.fillRect(0, y - r, W, r * 2);
     }
-    g.globalCompositeOperation = 'destination-in';               // мягкое затухание к краям
-    const mask = g.createRadialGradient(cx, cy, 0, cx, cy, S * 0.5);
-    mask.addColorStop(0, 'rgba(0,0,0,1)'); mask.addColorStop(0.55, 'rgba(0,0,0,0.85)'); mask.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = mask; g.fillRect(0, 0, S, S);
-    g.globalCompositeOperation = 'source-over';
-    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
+    return t;
   })();
 
-  // ── Скин планеты: МЕТАЛЛ + РЕЛЬЕФ, иконка на 6 ГРАНЯХ КУБА ──────────────
-  // «Запекаем» куб→равноугольную развёртку: для каждого пикселя сферы берём
-  // направление, определяем грань куба (+X,-X,+Y,-Y,+Z,-Z) и кладём иконку на эту
-  // грань → 6 иконок покрывают всю поверхность (1 верх, 1 низ, 4 по экватору),
-  // полюса корректные. Тонкий металлический шов между гранями. bumpMap+emissiveMap.
-  function cubeIconTexture(url) {
-    const W = 1024, H = 512;
-    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-    const g = cv.getContext('2d');
-    g.fillStyle = '#000'; g.fillRect(0, 0, W, H);
+  // ── Иконка инструмента → текстура (прозрачный фон, на верхнюю грань чипа) ──
+  function iconTexture(url) {
+    const S = 256, cv = document.createElement('canvas'); cv.width = cv.height = S;
     const tex = new THREE.CanvasTexture(cv);
     tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = MAX_ANISO;
     const img = new Image();
     img.onload = () => {
-      const IS = Math.min(img.naturalWidth || 512, 512), ic = document.createElement('canvas'); ic.width = ic.height = IS;
-      const ig = ic.getContext('2d'); ig.drawImage(img, 0, 0, IS, IS);
-      const id = ig.getImageData(0, 0, IS, IS).data;
-      const out = g.getImageData(0, 0, W, H), od = out.data;
-      const cphi = new Float32Array(W), sphi = new Float32Array(W);
-      for (let px = 0; px < W; px++) { const phi = (px + 0.5) / W * 6.2831853; cphi[px] = Math.cos(phi); sphi[px] = Math.sin(phi); }
-      const inset = 0.0, t0 = inset, t1 = 1 - inset, span = t1 - t0;  // 0 = фото стыкуются по краям
-      for (let py = 0; py < H; py++) {
-        const theta = (py + 0.5) / H * Math.PI, st = Math.sin(theta), dy = Math.cos(theta);
-        for (let px = 0; px < W; px++) {
-          const dx = st * sphi[px], dz = st * cphi[px];
-          // Стандартная куб-конвенция (sc/tc/ma) + разворот u для вида СНАРУЖИ →
-          // текст читается верно на всех 6 гранях и стыкуется по рёбрам.
-          const ax = Math.abs(dx), ay = Math.abs(dy), az = Math.abs(dz);
-          let sc, tc, ma;
-          if (ax >= ay && ax >= az) { ma = ax; if (dx > 0) { sc = -dz; tc = -dy; } else { sc = dz; tc = -dy; } }
-          else if (ay >= az) { ma = ay; if (dy > 0) { sc = dx; tc = dz; } else { sc = dx; tc = -dz; } }
-          else { ma = az; if (dz > 0) { sc = dx; tc = -dy; } else { sc = -dx; tc = -dy; } }
-          let u2 = 0.5 + (sc / ma) * 0.5, v2 = (tc / ma) * 0.5 + 0.5;
-          if (u2 < t0 || u2 > t1 || v2 < t0 || v2 > t1) continue;          // металлический шов
-          const sx = Math.min(IS - 1, ((u2 - t0) / span * IS) | 0);
-          const sy = Math.min(IS - 1, ((v2 - t0) / span * IS) | 0);
-          const si = (sy * IS + sx) * 4;
-          if (id[si + 3] < 8) continue;                                    // прозрачный угол → металл
-          const oi = (py * W + px) * 4;
-          od[oi] = id[si]; od[oi + 1] = id[si + 1]; od[oi + 2] = id[si + 2]; od[oi + 3] = 255;
-        }
-      }
-      g.putImageData(out, 0, 0);
+      const g = cv.getContext('2d'); g.clearRect(0, 0, S, S);
+      const pad = S * 0.12, iw = S - pad * 2;
+      g.drawImage(img, pad, pad, iw, iw);
       tex.needsUpdate = true;
     };
     img.onerror = () => {};
@@ -304,402 +254,167 @@ export function start(opts) {
     return tex;
   }
 
-  // Металлическая планета: полированный тёмный металл + вытравленная иконка с 2 сторон.
-  function makeMetalPlanet(key, radius, color, emissive) {
-    const tex = cubeIconTexture(ICON[key]);
-    const metal = new THREE.Color(color).lerp(new THREE.Color(0x24242c), 0.55);  // брендовый металл (цвет читается ярче)
-    const mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(radius, 64, 48),
-      new THREE.MeshPhysicalMaterial({
-        color: metal, metalness: 0.95, roughness: 0.32, envMapIntensity: 1.25,
-        clearcoat: 1.0, clearcoatRoughness: 0.18,                 // полированный лак → премиум-блик
-        bumpMap: tex, bumpScale: 0.06, emissiveMap: tex, emissive: 0xffffff, emissiveIntensity: emissive,
-      })
-    );
-    return mesh;
-  }
-
-  // ── Fresnel-атмосфера: тонкая back-lit оболочка вокруг планеты/ядра ─────
-  // BackSide + additive: свечение концентрируется на силуэте (лимб атмосферы).
-  // Без текстур → дёшево; ребёнок группы планеты/ядра → масштабируется с reveal/пульсом
-  // и попадает под scene.traverse в _teardownGPU (geometry + material dispose).
-  function makeAtmosphere(radius, color) {
-    const mat = new THREE.ShaderMaterial({
-      uniforms: {
-        uColor: { value: new THREE.Color(color) },
-        uPower: { value: 3.0 }, uStrength: { value: 1.3 },
-      },
-      vertexShader: `
-        varying vec3 vN; varying vec3 vV;
-        void main() {
-          vec4 mv = modelViewMatrix * vec4(position, 1.0);
-          vN = normalize(normalMatrix * normal);
-          vV = normalize(-mv.xyz);
-          gl_Position = projectionMatrix * mv;
-        }`,
-      fragmentShader: `
-        precision mediump float;
-        uniform vec3 uColor; uniform float uPower; uniform float uStrength;
-        varying vec3 vN; varying vec3 vV;
-        void main() {
-          float f = pow(1.0 - abs(dot(vN, vV)), uPower);
-          gl_FragColor = vec4(uColor * uStrength * f, f);
-        }`,
-      transparent: true, blending: THREE.AdditiveBlending,
-      depthWrite: false, side: THREE.BackSide,
-    });
-    return new THREE.Mesh(new THREE.SphereGeometry(radius * 1.04, 40, 28), mat);
-  }
-
-  // Светящиеся линии ПО ШВАМ куба (рёбра куба, спроецированные на сферу).
-  // Кладётся ребёнком планеты → вращается вместе с гранями. Зажигается при фокусе.
-  const seamMats = [];                                 // материалы швов (обновляем resolution на resize)
-  function makeSeams(radius) {
-    const corners = [];
-    for (const sx of [-1, 1]) for (const sy of [-1, 1]) for (const sz of [-1, 1]) corners.push([sx, sy, sz]);
-    const N = 16, pos = [];
-    for (let a = 0; a < 8; a++) for (let b = a + 1; b < 8; b++) {
-      let diff = 0; for (let k = 0; k < 3; k++) if (corners[a][k] !== corners[b][k]) diff++;
-      if (diff !== 1) continue;                          // только рёбра (12 шт.)
-      const A = corners[a], B = corners[b]; let prev = null;
-      for (let s = 0; s <= N; s++) {
-        const t = s / N;
-        const x = A[0] + (B[0] - A[0]) * t, y = A[1] + (B[1] - A[1]) * t, z = A[2] + (B[2] - A[2]) * t;
-        const inv = radius / Math.hypot(x, y, z);
-        const P = [x * inv, y * inv, z * inv];
-        if (prev) pos.push(prev[0], prev[1], prev[2], P[0], P[1], P[2]);
-        prev = P;
+  // ── Текстуры платы: гетинакс + красные PCB-трейсы (map + emissive-маска) ──
+  // Трейсы — Manhattan-блуждания + контактные площадки. Красный — только из ACCENT.
+  function makeBoardTextures() {
+    const S = 1024;
+    const mc = document.createElement('canvas'); mc.width = mc.height = S; const mg = mc.getContext('2d');
+    const ec = document.createElement('canvas'); ec.width = ec.height = S; const eg = ec.getContext('2d');
+    mg.fillStyle = '#0a0f0c'; mg.fillRect(0, 0, S, S);                 // тёмный гетинакс
+    eg.fillStyle = '#000'; eg.fillRect(0, 0, S, S);                   // emissive: чёрная база
+    mg.lineCap = 'round'; eg.lineCap = 'round';
+    const D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    function walk(x, y, steps, lw) {
+      mg.lineWidth = lw; eg.lineWidth = lw;
+      mg.strokeStyle = 'rgba(' + ((_AR * 0.5) | 0) + ',' + ((_AG * 0.35) | 0) + ',' + ((_AB * 0.38) | 0) + ',0.55)';
+      eg.strokeStyle = accRGBA(0.85);
+      mg.beginPath(); eg.beginPath(); mg.moveTo(x, y); eg.moveTo(x, y);
+      let d = (Math.random() * 4) | 0;
+      for (let s = 0; s < steps; s++) {
+        if (Math.random() < 0.3) d = (Math.random() * 4) | 0;
+        const len = 14 + Math.random() * 46;
+        x = clampv(x + D[d][0] * len, 0, S); y = clampv(y + D[d][1] * len, 0, S);
+        mg.lineTo(x, y); eg.lineTo(x, y);
       }
+      mg.stroke(); eg.stroke();
     }
-    const geo = new LineSegmentsGeometry();
-    geo.setPositions(pos);
-    const mat = new LineMaterial({
-      color: 0xff3344, linewidth: 4, transparent: true, opacity: 0,   // красный неон по швам
-      blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true,
-    });
-    mat.resolution.set(window.innerWidth, window.innerHeight);        // нужен для толщины в px
-    seamMats.push(mat);
-    const seams = new LineSegments2(geo, mat);
-    seams.visible = false;
-    return seams;
+    for (let i = 0; i < 130; i++) walk(Math.random() * S, Math.random() * S, 3 + (Math.random() * 5 | 0), Math.random() < 0.2 ? 5 : 3);
+    // контактные площадки (pads) — ярче на emissive
+    for (let i = 0; i < 90; i++) {
+      const x = Math.random() * S, y = Math.random() * S, r = 3 + Math.random() * 5;
+      mg.fillStyle = accRGBA(0.4); eg.fillStyle = accRGBA(0.95);
+      mg.beginPath(); mg.arc(x, y, r, 0, 7); mg.fill();
+      eg.beginPath(); eg.arc(x, y, r, 0, 7); eg.fill();
+    }
+    const mk = (cv, srgb) => { const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = MAX_ANISO; t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping; return t; };
+    return { map: mk(mc), emis: mk(ec) };
   }
 
+  // ── Геометрия наклонённой платы ───────────────────────────────────────
+  const BOARD_TILT = 0.6;                              // наклон платы (вид «на стол под углом»)
+  const boardQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(BOARD_TILT, 0, 0));
+  const _bw = new THREE.Vector3();                     // временный (layout): board-local → world-local
+  const _bn = new THREE.Vector3();                     // нормаль платы (world)
+  // board-плоскость (u=гориз, v=глубина, h=высота над платой) → world-локаль (наклон вшит).
+  function boardToWorld(u, v, h, out) { (out || _bw).set(u, h, v).applyQuaternion(boardQuat); return out || _bw; }
 
-  // ── «Электросхема»-скин: ветвящиеся линии, просыпаются при наведении ───
-  // Рисуем ветвящееся дерево дорожек. В зелёный канал пишем «порядок роста»
-  // (длина пути от корня), чтобы шейдер раскрывал линии корень→ветки→кончики.
-  const circuitTex = (function () {
-    const S = 1024, cv = document.createElement('canvas'); cv.width = cv.height = S;
-    const g = cv.getContext('2d');
-    g.fillStyle = '#000'; g.fillRect(0, 0, S, S);
-    g.lineWidth = 8; g.lineCap = 'round'; g.lineJoin = 'round';
-    const grid = 30, NORM = 700;           // NORM ≈ макс. длина ветки (норм. зелёного)
-    let segs = 0; const MAX = 3200;        // общий потолок безопасности
-    let treeSegs = 0; const TREE_MAX = 34; // лимит на ОДНО дерево → все семена успевают вырасти
-    const dirs = [[grid, 0], [-grid, 0], [0, grid], [0, -grid]];
-    const turn = d => (d[0] !== 0 ? [0, Math.random() < 0.5 ? grid : -grid]
-                                  : [Math.random() < 0.5 ? grid : -grid, 0]);
-    function seg(x0, y0, x1, y1, dist) {
-      const gG = Math.max(0, Math.min(255, (dist / NORM) * 255 | 0));
-      g.strokeStyle = 'rgb(255,' + gG + ',0)';        // R=линия, G=порядок роста
-      g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
-    }
-    function grow(x, y, dir, gen, dist) {
-      if (gen > 5 || treeSegs > TREE_MAX || segs > MAX) return;
-      const run = 2 + (Math.random() * 5 | 0);
-      for (let i = 0; i < run; i++) {
-        if (treeSegs > TREE_MAX || segs > MAX) return;
-        const nx = x + dir[0], ny = y + dir[1];
-        if (nx < 0 || nx >= S || ny < 0 || ny >= S) break;   // дошли до края — ветка кончилась
-        seg(x, y, nx, ny, dist);
-        x = nx; y = ny; dist += grid; segs++; treeSegs++;
-        if (Math.random() < 0.28) dir = turn(dir);
-      }
-      grow(x, y, turn(dir), gen + 1, dist);                  // ответвление
-      if (Math.random() < 0.7) grow(x, y, turn(dir), gen + 1, dist);  // второе
-      if (Math.random() < 0.55) grow(x, y, dir, gen + 1, dist);       // продолжение
-    }
-    // «Семена» равномерной сеткой с джиттером → дорожки покрывают ВСЮ поверхность.
-    const step = 150;
-    for (let gy = step / 2; gy < S; gy += step) {
-      for (let gx = step / 2; gx < S; gx += step) {
-        const jx = gx + (Math.random() * 2 - 1) * step * 0.35;
-        const jy = gy + (Math.random() * 2 - 1) * step * 0.35;
-        const x = (jx / grid | 0) * grid, y = (jy / grid | 0) * grid;
-        treeSegs = 0;                       // свой бюджет на каждое семя → дорожки ВЕЗДЕ
-        grow(x, y, dirs[Math.random() * 4 | 0], 0, 0);
-      }
-    }
-    const tex = new THREE.CanvasTexture(cv);
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.minFilter = THREE.LinearFilter;        // без мипмапов — тонкие линии не «съедаются»
-    tex.generateMipmaps = false;
-    tex.colorSpace = THREE.NoColorSpace;       // сырые значения каналов (R=линия, G=рост)
-    return tex;
-  })();
-
-  const circuitVert = `
-    varying vec2 vUv;
-    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
-  const circuitFrag = `
-    varying vec2 vUv;
-    uniform sampler2D tMap; uniform float uProg; uniform float uTime; uniform vec3 uColor;
-    void main(){
-      vec4 tx = texture2D(tMap, vUv);
-      float trace = tx.r;                       // присутствие линии
-      if (trace < 0.12) discard;
-      float growth = tx.g;                      // порядок роста (0 корень .. 1 кончик)
-      float reveal = step(growth, uProg);       // показываем доросшее
-      float tip = smoothstep(0.05, 0.0, abs(growth - uProg)); // яркий растущий кончик
-      float grown = smoothstep(0.8, 1.0, uProg);             // степень «доросло»
-      float flow = 0.55 + 0.45 * sin(uTime * 8.0 - growth * 42.0); // ток вдоль роста
-      float pulse = 0.55 + 0.45 * sin(uTime * 4.0);          // общий пульс после остановки
-      float bright = reveal * mix(flow, pulse, grown) + tip * 1.7;
-      float a = trace * bright;
-      if (a < 0.02) discard;
-      gl_FragColor = vec4(uColor * a * 2.4, a);
-    }`;
-
-  function makeCircuit(radius) {
-    const mat = new THREE.ShaderMaterial({
-      uniforms: {
-        tMap: { value: circuitTex }, uProg: { value: 0 }, uTime: { value: 0 },
-        uColor: { value: new THREE.Color(0xff1a2a) },
-      },
-      vertexShader: circuitVert, fragmentShader: circuitFrag,
-      transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.FrontSide,
-    });
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 48, 48), mat);
-    mesh.visible = false;
-    return { mesh, mat, prog: 0 };
-  }
-
-  // ── Ядро (планета Platform + кольца) ──────────────────────────────────
-  const coreGroup = new THREE.Group();
-  world.add(coreGroup);
-  const coreMesh = makeMetalPlanet('platform', 1.6, ACCENT, 0.65);
-  const coreInner = coreMesh;
-  const coreTilt = new THREE.Group();
-  coreTilt.rotation.set(0.24, 0, 0.15);                // осевой наклон ядра
-  coreTilt.add(coreMesh); coreGroup.add(coreTilt);
-  const coreSeams = makeSeams(1.6 * 1.015);
-  coreMesh.add(coreSeams);
-  const coreCircuit = makeCircuit(1.6 * 1.012);
-  coreMesh.add(coreCircuit.mesh);
-  const coreHalo = glowSprite(0xff5a67, 16, 0, nebulaTex);
-  coreGroup.add(coreHalo);
-  coreGroup.add(makeAtmosphere(1.6, ACCENT));            // back-lit лимб ядра (следует за пульсом coreGroup)
-
-  // ── Энерго-трубы ядро→планета: металлический кожух со стеклянными окнами, сквозь ──
-  //    которые видно бегущую внутри КРАСНУЮ энергию. Текстуры общие на все трубы.
-  const tubeR = 0.06;
-  // Поток энергии: почти чёрно-красная база + бегущие яркие импульсы (анимируем offset.y).
-  const energyTex = (function () {
-    const W = 8, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
-    const g = c.getContext('2d');
-    g.fillStyle = '#180206'; g.fillRect(0, 0, W, H);
-    for (let i = 0; i < 3; i++) {
-      const y = (i + 0.5) / 3 * H, r = H * 0.17;
-      const grd = g.createLinearGradient(0, y - r, 0, y + r);
-      grd.addColorStop(0, '#180206'); grd.addColorStop(0.5, '#ff5a64'); grd.addColorStop(1, '#180206');
-      g.fillStyle = grd; g.fillRect(0, y - r, W, r * 2);
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace;
-    return t;
-  })();
-  // Окна-стекло: alphaMap кожуха — белое = металл (есть), чёрное = окно (дырка → видно энергию).
-  const glassTex = (function () {
-    const W = 8, H = 64, c = document.createElement('canvas'); c.width = W; c.height = H;
-    const g = c.getContext('2d');
-    g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
-    g.fillStyle = '#000'; g.fillRect(0, H * 0.32, W, H * 0.34);
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 6);   // шаблон-окна (клон на трубу → свой repeat)
-    return t;
-  })();
-
-  // ── Энерго-ДУГИ: каждый кондуит ВЫГНУТ дугой через глубину в СВОЮ плоскость ──
-  //    (7 дуг в 7 плоскостях/глубинах → силуэт «дышит» при вращении world, плоский
-  //    радиальный «астериск» исчезает). Тот же инженерный язык (металл/стекло-окна/
-  //    бегущая энергия), но геометрия — TubeGeometry по QuadraticBezierCurve3.
-  //    Дуги — per-node (reveal/fade per-planet через material.opacity). Стабилизатор-
-  //    кольца + раструбы — InstancedMesh с общим «gunmetal» (fade в кадре). ПРЯМОЙ
-  //    спайн-балки/стоек НЕТ (давали плоскость/висящую линию) — дуга самонесущая.
-  const CORE_R = 1.6;                                  // радиус ядра (выход дуги)
-  const CONN_CORE = 1.8, CONN_PLANET = 1.05;           // масштаб раструбов (у ядра крупнее)
-  const BOW_PERP = 0.30, BOW_Z = 0.42, BOW_MAX = 0.62; // выгиб: ⟂-амплитуда / глубина / кламп (×длину хорды)
-
-  // Энергия и окна бегут ВДОЛЬ дуги. У TubeGeometry V=поперёк трубы (вокруг), U=длина —
-  // поворот текстур на 90° (rotation=PI/2, center 0.5) переносит ось вариации энергии/
-  // окон на ДЛИНУ дуги, поэтому прежний скролл energyTex.offset.y продолжает бежать вдоль.
-  energyTex.rotation = Math.PI / 2; energyTex.center.set(0.5, 0.5);
-
-  // Тонкая нормаль-карта кожуха: продольные штрихи + кольцевые риски (брашд-металл).
-  const tubeNormalTex = (function () {
-    const W = 128, H = 128, c = document.createElement('canvas'); c.width = W; c.height = H;
-    const g = c.getContext('2d');
-    g.fillStyle = '#8080ff'; g.fillRect(0, 0, W, H);                 // плоская нормаль (RGB ~128,128,255)
-    for (let i = 0; i < 26; i++) {                                    // продольные штрихи
-      const x = Math.random() * W, w = 1 + Math.random() * 2;
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(118,128,255,0.5)' : 'rgba(140,128,255,0.5)';
-      g.fillRect(x, 0, w, H);
-    }
-    for (let i = 0; i < 10; i++) {                                    // кольцевые риски
-      const y = Math.random() * H;
-      g.fillStyle = Math.random() < 0.5 ? 'rgba(128,116,255,0.45)' : 'rgba(128,140,255,0.45)';
-      g.fillRect(0, y, W, 1 + Math.random() * 1.5);
-    }
-    const t = new THREE.CanvasTexture(c);
-    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.NoColorSpace; t.repeat.set(2, 6);
-    return t;
-  })();
-
-  // Общий тёмный материал хардвера (стабилизатор-кольца + коннекторы-раструбы).
-  // transparent+opacity → общий fade хардвера с дугами (intro-reveal / фокус / выбор ядра).
-  const gunmetalMat = new THREE.MeshStandardMaterial({
-    color: 0x1c1e26, metalness: 0.9, roughness: 0.4, envMapIntensity: 1.0, transparent: true,
+  const boardTex = makeBoardTextures();
+  const boardMat = new THREE.MeshStandardMaterial({
+    map: boardTex.map, emissiveMap: boardTex.emis, emissive: 0xffffff, emissiveIntensity: 0.6,
+    roughness: 0.62, metalness: 0.28,
   });
+  const BOARD_BASE = 12;                               // базовый размер плиты (масштабируется на layout)
+  const board = new THREE.Mesh(new THREE.BoxGeometry(BOARD_BASE, 0.22, BOARD_BASE), boardMat);
+  board.quaternion.copy(boardQuat);
+  world.add(board);
 
-  // Геометрии хардвера (по 1 на тип → InstancedMesh, 2 draw call на все 7 дуг).
-  const ringGeo      = new THREE.TorusGeometry(tubeR * 1.30, tubeR * 0.28, 8, 18);       // стабилизатор-кольцо (ось Z = тангенс)
-  const connectorGeo = new THREE.CylinderGeometry(tubeR, tubeR * 2.2, tubeR * 4, 16, 1); // раструб (узкий→широкий)
+  // ── CPU-ЯДРО (Vacantrix Platform, coreEntry) — ступенчатый чип в центре ──
+  const CPU_W = 2.3, CPU_R = 1.25;                     // ширина CPU / радиус выхода дорожек
+  const coreGroup = new THREE.Group();
+  coreGroup.quaternion.copy(boardQuat);
+  world.add(coreGroup);
+  const cpuSocket = new THREE.Mesh(new THREE.BoxGeometry(CPU_W * 1.18, 0.16, CPU_W * 1.18),
+    new THREE.MeshStandardMaterial({ color: 0x0c0e14, metalness: 0.7, roughness: 0.45 }));
+  cpuSocket.position.y = 0.08; coreGroup.add(cpuSocket);
+  const cpuBody = new THREE.Mesh(new THREE.BoxGeometry(CPU_W, 0.5, CPU_W),
+    new THREE.MeshStandardMaterial({ color: 0x14161e, metalness: 0.85, roughness: 0.3, envMapIntensity: 1.2 }));
+  cpuBody.position.y = 0.41; coreGroup.add(cpuBody);
+  const cpuCap = new THREE.Mesh(new THREE.BoxGeometry(CPU_W * 0.7, 0.3, CPU_W * 0.7),
+    new THREE.MeshStandardMaterial({ color: 0x2a0d12, metalness: 0.6, roughness: 0.25,
+      emissive: ACCENT, emissiveIntensity: 0.4 }));
+  cpuCap.position.y = 0.81; coreGroup.add(cpuCap);
+  const coreInner = cpuCap;                            // ярко-эмиссивный «горячий» хедспредер (анимируется ig)
+  const cpuIcon = new THREE.Mesh(new THREE.PlaneGeometry(CPU_W * 0.5, CPU_W * 0.5),
+    new THREE.MeshBasicMaterial({ map: iconTexture(ICON.platform), transparent: true }));
+  cpuIcon.rotation.x = -Math.PI / 2; cpuIcon.position.y = 0.97; coreGroup.add(cpuIcon);
+  // подсветка-рамка ядра (пульсирует при фокусе/выборе Platform) — рёбра кепки
+  const coreSeams = new THREE.LineSegments(new THREE.EdgesGeometry(cpuCap.geometry),
+    new THREE.LineBasicMaterial({ color: ACCENT, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false }));
+  cpuCap.add(coreSeams); coreSeams.visible = false;
+  const coreHalo = glowSprite(ACCENT, 3.4, 0);
+  coreHalo.position.y = 1.0; coreGroup.add(coreHalo);
 
-  const rig = new THREE.Group(); world.add(rig);       // world-space → крутится с системой
-  let ringInst = null, connectorInst = null;
-  // Временные для дуг/матриц хардвера (ТОЛЬКО на layout/resize, НЕ в кадре).
-  const _aY = new THREE.Vector3(0, 1, 0), _aZ = new THREE.Vector3(0, 0, 1);
-  const _aUpW = new THREE.Vector3(0, 1, 0), _aAltW = new THREE.Vector3(1, 0, 0);
-  const _aDir = new THREE.Vector3(), _aA = new THREE.Vector3(), _aB = new THREE.Vector3(), _aM = new THREE.Vector3();
-  const _aPerp = new THREE.Vector3(), _aBow = new THREE.Vector3(), _aCtrl = new THREE.Vector3();
-  const _aT0 = new THREE.Vector3(), _aT1 = new THREE.Vector3(), _aAxis = new THREE.Vector3();
-  const _aPos = new THREE.Vector3(), _aScl = new THREE.Vector3(), _aQ = new THREE.Quaternion(), _aMx = new THREE.Matrix4();
-
-  // ── Планеты-продукты: фиксированная раскладка по всему экрану ──────────
-  // Нормированные позиции (-1..1) по ширине/высоте — каждой планете свой угол
-  // экрана с запасом места. Реальные координаты считаются в layoutHomes() под
-  // текущий вьюпорт. Планеты не летают по орбитам — лишь слегка покачиваются.
-  // Раскладка планет: [nx, ny, nz] — угловое положение вокруг ядра (как и было,
-  // передний вид узнаваем) + ВЫРАЖЕННАЯ глубина по Z (нормир. −1..1, ×DEPTH).
-  // Глубина чередуется вперёд/назад → при вращении сцена читается ОБЪЁМНО (3D-орб),
-  // а не плоским кольцом. nz знак: + к камере (ближе/крупнее), − вглубь.
-  // Несимметричный 3D-разброс (раскидано по разным координатам, без зеркальных пар):
-  // у каждой планеты свой угол/радиус на экране И выраженная разная глубина nz → читается
-  // как настоящая 3D-система, а не плоское кольцо. [nx, ny, nz(−вглубь / +к камере)].
+  // ── Чипы-инструменты (nodes) ──────────────────────────────────────────
+  // Раскладка [nx, ny] — позиция чипа на ПЛОСКОСТИ платы (−1..1), как угол вокруг
+  // CPU. Реальные board-координаты считаются в layoutHomes() из вьюпорта.
   const LAYOUT = {
-    hh:        [ 0.31,  0.86,  0.35],
-    avito:     [ 0.90,  0.29, -0.72],
-    tasks:     [-0.67,  0.57,  0.84],
-    publisher: [-0.85, -0.31, -0.50],
-    leads:     [-0.20, -0.79,  0.60],
-    monitor:   [ 0.61, -0.73,  0.16],
-    analytics: [ 0.66, -0.15, -0.92],
+    hh:        [ 0.34,  0.92],
+    avito:     [ 0.96,  0.30],
+    tasks:     [-0.72,  0.62],
+    publisher: [-0.95, -0.34],
+    leads:     [-0.22, -0.86],
+    monitor:   [ 0.66, -0.78],
+    analytics: [ 0.70, -0.12],
   };
-  const SPREAD = 0.74;                                 // доля полуэкрана (поджат — запас под глубину, чтобы передние не клипались)
-  const DEPTH  = 3.6;                                  // масштаб глубины Z (увеличен → выраженный 3D-разброс)
-  // Реалистичные оси: у каждой планеты СВОЙ осевой наклон [x-наклон, z-крен] (как Земля 23°,
-  // Уран ~98° → leads, почти прямая ось → avito) + индивидуальный размер. Не паттерн i%N.
-  const AXIAL = {
-    hh: [0.41, 0.10], avito: [0.05, -0.04], tasks: [0.92, 0.28], publisher: [0.47, -0.20],
-    leads: [1.55, 0.16], monitor: [0.22, -0.12], analytics: [0.64, 0.24],
-  };
-  const PRADIUS = { hh: 1.02, avito: 0.90, tasks: 0.84, publisher: 0.88, leads: 1.00, monitor: 0.86, analytics: 0.96 };
-  const STAGE_MIN = 0.72, STAGE_MAX = 1.85;            // ограничение соотношения «сцены» (центрируем созвездие)
+  const SPREAD = 0.74;
+  const BOARD_FIT = 0.72;                              // плотность чипов вокруг CPU (доля рамки сцены)
+  const STAGE_MIN = 0.72, STAGE_MAX = 1.85;
+  const CHIP_W = 1.5, CHIP_D = 1.2, CHIP_H = 0.42, CHIP_R = 0.8;   // габариты чипа / радиус входа дорожки
+  const TRACE_H = 0.07, TRACE_W = 0.13, TRACE_PITCH = 1.1;        // дорожка над платой / ширина / шаг тока
 
   const tmp = new THREE.Vector3();
   const nodes = KEYS.map((key, i) => {
     const color = NODE_COLORS[key];
-    const pradius = PRADIUS[key];                      // индивидуальный размер планеты
-    const spin    = 0.22 + (i % 4) * 0.08;             // самовращение
     const nx = LAYOUT[key][0], ny = LAYOUT[key][1];
-    const nz = LAYOUT[key][2];                          // нормир. глубина (−1..1), масштабируется DEPTH в layoutHomes
-    // лёгкий дрейф (небольшая амплитуда): покачивание вокруг своей точки
-    const ax = 0.26 + (i % 3) * 0.05, ay = 0.22 + (i % 2) * 0.06, az = 0.45;
-    const fx = 0.45 + (i % 3) * 0.07, fy = 0.38 + (i % 2) * 0.06, fz = 0.30 + (i % 4) * 0.04;
-    const ph = i * 1.7, py = i * 2.3, pz = i * 1.1;
 
     const grp = new THREE.Group();
-    const mesh = makeMetalPlanet(key, pradius, color, 0.6);
-    const core = mesh;                                  // ядро вращения = сама планета
-    // осевой наклон (как у реальных планет), у каждой свой угол → вращение вокруг наклонённой оси
-    const tilt = new THREE.Group();
-    tilt.rotation.set(AXIAL[key][0], 0, AXIAL[key][1]);  // реалистичный осевой наклон планеты
-    tilt.add(mesh); grp.add(tilt);
-    const seams = makeSeams(pradius * 1.015);
-    mesh.add(seams);                                    // ребёнок планеты → крутится с гранями
-    const circuit = makeCircuit(pradius * 1.012);
-    mesh.add(circuit.mesh);                             // ребёнок планеты → наклон+вращение авто
-    const halo = glowSprite(color, pradius * 4.8, 0, nebulaTex);
-    halo.material.rotation = Math.random() * 6.2831853;   // своя фаза «облака»
-    grp.add(halo);
-    grp.add(makeAtmosphere(pradius, color));           // back-lit лимб в цвете планеты (масштабируется с reveal grp)
+    grp.quaternion.copy(boardQuat);                    // чип стоит вдоль нормали наклонённой платы
+    const body = new THREE.Mesh(new THREE.BoxGeometry(CHIP_W, CHIP_H, CHIP_D),
+      new THREE.MeshStandardMaterial({ color: 0x15171d, metalness: 0.55, roughness: 0.48,
+        envMapIntensity: 1.0, emissive: color, emissiveIntensity: 0.22 }));   // рамка светится цветом бренда
+    grp.add(body);
+    const mesh = body;                                 // пикабельный меш
+    const iconTex = iconTexture(ICON[key]);
+    const top = new THREE.Mesh(new THREE.PlaneGeometry(CHIP_W * 0.78, CHIP_D * 0.78),
+      new THREE.MeshBasicMaterial({ map: iconTex, transparent: true }));
+    top.rotation.x = -Math.PI / 2; top.position.y = CHIP_H / 2 + 0.012; grp.add(top);
     grp.scale.setScalar(0.001);                        // спрятан до раскрытия
     world.add(grp);
 
-    // Энерго-ДУГА ядро→планета: TubeGeometry по выгнутой кривой (строится в updateArcs
-    // на layout/resize, НЕ в кадре). Per-node материалы → reveal/fade per-planet через
-    // opacity. Кожух/энергия при opacity≈1 ведут себя как непрозрачные (depthWrite),
-    // винная гильза — поверх (depthWrite:false). Геометрия — плейсхолдер до updateArcs.
-    const curve = new THREE.QuadraticBezierCurve3(
-      new THREE.Vector3(), new THREE.Vector3(0, 0.5, 0), new THREE.Vector3(0, 1, 0));
-    const tubeEnergy = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
-      map: energyTex, transparent: true, opacity: 0,                  // бегущая красная энергия
-    }));
-    const shellTex = glassTex.clone();                                // окна — свой клон (ровный шаг по длине)
-    shellTex.rotation = Math.PI / 2; shellTex.center.set(0.5, 0.5);   // V→длина дуги (окна вдоль трубы)
-    shellTex.needsUpdate = true;
-    const tubeShell = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({
-      color: 0x24262f, metalness: 0.96, roughness: 0.28, envMapIntensity: 1.15,
-      alphaMap: shellTex, alphaTest: 0.1, side: THREE.DoubleSide,     // окна-дырки (видна толщина стенки)
-      normalMap: tubeNormalTex, normalScale: new THREE.Vector2(0.35, 0.35),
-      transparent: true, opacity: 0,
-    }));
-    const tubeGlass = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({
-      color: 0x401015, transparent: true, opacity: 0, roughness: 0.12, metalness: 0.0,  // тёмно-винная гильза
-      envMapIntensity: 1.6, side: THREE.DoubleSide, depthWrite: false,
-    }));
-    tubeGlass.renderOrder = 2;
-    const tube = new THREE.Group();
-    tube.add(tubeEnergy); tube.add(tubeGlass); tube.add(tubeShell);
-    tube.visible = false;                                 // скрыта до раскрытия (opacity-reveal)
-    world.add(tube);
+    // мягкое свечение слота в цвете бренда (рамка)
+    const halo = glowSprite(color, 2.4, 0);
+    halo.position.y = CHIP_H * 0.2; grp.add(halo);
 
+    // дорожка-трейс к CPU (бегущий ток) — геометрия строится в updateTraces()
+    const traceMesh = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshBasicMaterial({
+      map: energyTex, transparent: true, opacity: 0, depthWrite: false,
+      side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
+    }));
+    traceMesh.visible = false; world.add(traceMesh);
+
+    // интро-импульс «искра из CPU к чипу»
     const lineGeo = new THREE.BufferGeometry();
     lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
     const line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({
       color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false,
     }));
     world.add(line);
-
     const pulse = glowSprite(color, 1.0, 0);
     world.add(pulse);
 
     return {
-      key, color, mesh, core, grp, halo, line, pulse, spin, circuit, seams, tube,
-      pradius, shellTex, curve, _rings: 2,               // дуга: радиус планеты, клон окон, кривая, число колец
-      tubeShellMesh: tubeShell, tubeEnergyMesh: tubeEnergy, tubeGlassMesh: tubeGlass,
-      nx, ny, nz, home: new THREE.Vector3(), target: new THREE.Vector3(),
-      ax, ay, az, fx, fy, fz, ph, py, pz, revealed: false,
+      key, color, grp, mesh, halo, line, pulse, traceMesh, iconTex,
+      pickR: Math.hypot(CHIP_W, CHIP_D) * 0.5 + 0.18,
+      nx, ny, planeU: 0, planeV: 0,
+      home: new THREE.Vector3(), target: new THREE.Vector3(), revealed: false,
     };
   });
 
-  // ── Цели наведения (планеты + ядро) и raycast ─────────────────────────
-  const coreEntry = { key: 'platform', grp: coreGroup, mesh: coreMesh, core: coreInner, circuit: coreCircuit, seams: coreSeams, home: new THREE.Vector3() };
+  // ── Цели наведения (чипы + CPU) ───────────────────────────────────────
+  const coreEntry = { key: 'platform', grp: coreGroup, mesh: cpuBody, home: new THREE.Vector3(), pickR: CPU_W * 0.72 };
   const hoverables = [coreEntry].concat(nodes);
 
-  // Множители раскладки под форму экрана (непрерывно по соотношению сторон):
-  // широкий → шире по X и ниже по Y; портрет → у́же по X и выше по Y.
+  // ── Фоновое боке (глубина техно-пустоты) ──────────────────────────────
+  [[0x16203a, 30, 0.05, -8, 3, -12], [0x0d2030, 26, 0.045, 9, -4, -11], [ACCENT, 18, 0.03, 0, -2, -10]]
+    .forEach(([c, s, o, x, y, z]) => { const sp = glowSprite(c, s, o); sp.position.set(x, y, z); world.add(sp); });
+
+  // ── Раскладка чипов на плате ──────────────────────────────────────────
   function layoutFactors(a) {
-    const t = clampv((a - 0.55) / (2.0 - 0.55), 0, 1);   // 0 портрет .. 1 ультраширокий
+    const t = clampv((a - 0.55) / (2.0 - 0.55), 0, 1);
     return { xs: lerp(0.58, 1.10, t), ys: lerp(1.20, 0.84, t) };
   }
-
   let laidOut = false;
-  // Точка-цель планеты под текущий вьюпорт. Планета плавно едет к ней (лерп в frame);
-  // первая раскладка ставится сразу (без анимации при загрузке).
-  // «Сцена-рамка»: созвездие держим в центрированной области с ограничением
-  // соотношения [STAGE_MIN..STAGE_MAX]. На сверхшироких/сверхузких экранах планеты
-  // НЕ растягиваются к краям — лишний простор по краям заполняет пыль/свечение.
   function layoutHomes() {
     const vFov = camera.fov * Math.PI / 180;
     const halfH = baseDist * Math.tan(vFov / 2);
@@ -708,90 +423,51 @@ export function start(opts) {
     const stageHalfW = halfH * Math.min(a, STAGE_MAX);
     const stageHalfH = a < STAGE_MIN ? halfW / STAGE_MIN : halfH;
     const f = layoutFactors(clampv(a, STAGE_MIN, STAGE_MAX));
+    let mU = 0, mV = 0;
     for (const n of nodes) {
-      n.target.set(
-        clampv(n.nx * f.xs, -0.97, 0.97) * stageHalfW * SPREAD,
-        clampv(n.ny * f.ys, -0.97, 0.97) * stageHalfH * SPREAD,
-        n.nz * DEPTH                                    // выраженная глубина → объёмное созвездие
-      );
+      const u = clampv(n.nx * f.xs, -0.97, 0.97) * stageHalfW * SPREAD * BOARD_FIT;
+      const v = clampv(n.ny * f.ys, -0.97, 0.97) * stageHalfH * SPREAD * BOARD_FIT;
+      n.planeU = u; n.planeV = v;
+      boardToWorld(u, v, CHIP_H * 0.5, n.target);
       if (!laidOut) n.home.copy(n.target);
+      mU = Math.max(mU, Math.abs(u)); mV = Math.max(mV, Math.abs(v));
     }
+    // CPU и точечный свет — в центре платы
+    boardToWorld(0, 0, 0.5, coreEntry.home);
+    corePoint.position.copy(coreEntry.home);
+    // плата масштабируется, чтобы покрыть чипы + поля
+    board.scale.set((mU + 2.4) / (BOARD_BASE / 2), 1, (mV + 2.4) / (BOARD_BASE / 2));
     laidOut = true;
   }
 
-  // ── Звёздное небо: 3 слоя точек с цветовой температурой + мерцанием ──────
-  // Дальний слой мелкий/тусклый, ближний крупнее → параллакс при вращении мира.
-  // Круглые мягкие точки (shader), цвет звезды = вес к холодным/белым.
-  const starMat = new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 }, uPix: { value: renderer.getPixelRatio() } },
-    vertexShader: `
-      attribute float aSize; attribute vec3 aColor;
-      uniform float uTime; uniform float uPix;
-      varying vec3 vC; varying float vTw;
-      void main(){
-        vC = aColor;
-        float ph = aSize * 53.0 + position.x * 0.7 + position.y * 1.3;
-        vTw = 0.72 + 0.28 * sin(uTime * 1.7 + ph);            // мерцание
-        vec4 mv = modelViewMatrix * vec4(position, 1.0);
-        gl_Position = projectionMatrix * mv;
-        gl_PointSize = min(48.0, aSize * uPix * (260.0 / -mv.z));   // attenuation по глубине + clamp
-      }`,
-    fragmentShader: `
-      varying vec3 vC; varying float vTw;
-      void main(){
-        vec2 d = gl_PointCoord - vec2(0.5);
-        float r2 = dot(d, d);
-        if (r2 > 0.25) discard;
-        float a = smoothstep(0.25, 0.0, r2);                  // круглая мягкая точка
-        gl_FragColor = vec4(vC * vTw, a);
-      }`,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  });
-  const STAR_TEMP = [
-    [0.62, 0.74, 1.0], [0.85, 0.90, 1.0], [1.0, 1.0, 1.0],
-    [1.0, 0.96, 0.86], [1.0, 0.84, 0.62], [1.0, 0.70, 0.50],
-  ];
-  function starLayer(count, rMin, rMax, sizeBase, sizeJit, bright) {
-    const pos = new Float32Array(count * 3), col = new Float32Array(count * 3), siz = new Float32Array(count);
-    for (let i = 0; i < count; i++) {
-      const r = rMin + Math.random() * (rMax - rMin);
-      const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
-      pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
-      pos[i * 3 + 1] = r * Math.sin(ph) * Math.sin(th);
-      pos[i * 3 + 2] = r * Math.cos(ph);
-      const u = Math.random();
-      let ti = u < 0.50 ? 1 : u < 0.78 ? 2 : u < 0.90 ? 3 : u < 0.97 ? 4 : 5;
-      if (Math.random() < 0.12) ti = 0;                        // редкие голубые
-      const c = STAR_TEMP[ti], b = bright * (0.5 + Math.random() * 0.7);
-      col[i * 3] = c[0] * b; col[i * 3 + 1] = c[1] * b; col[i * 3 + 2] = c[2] * b;
-      siz[i] = sizeBase + Math.random() * sizeJit;
-    }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
-    g.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
-    return new THREE.Points(g, starMat);
+  // ── Дорожки-трейсы: BufferGeometry-ленты на плате (пересборка на layout/resize) ──
+  function rebuildTrace(n) {
+    const len = Math.hypot(n.planeU, n.planeV) || 1e-3;
+    const dx = n.planeU / len, dz = n.planeV / len;    // направление CPU→чип в плоскости
+    const px = -dz, pz = dx;                           // перпендикуляр (ширина ленты)
+    const a0 = CPU_R, a1 = Math.max(a0 + 0.15, len - CHIP_R);
+    const w = TRACE_W, vlen = (a1 - a0) / TRACE_PITCH;
+    const pos = new Float32Array(12), uv = new Float32Array(8), nrm = new Float32Array(12);
+    const set = (idx, a, sgn, vc) => {
+      boardToWorld(dx * a + px * sgn * w, dz * a + pz * sgn * w, TRACE_H, _bw);
+      pos[idx * 3] = _bw.x; pos[idx * 3 + 1] = _bw.y; pos[idx * 3 + 2] = _bw.z;
+      uv[idx * 2] = sgn > 0 ? 1 : 0; uv[idx * 2 + 1] = vc;
+    };
+    set(0, a0, -1, 0); set(1, a0, 1, 0); set(2, a1, -1, vlen); set(3, a1, 1, vlen);
+    _bn.set(0, 1, 0).applyQuaternion(boardQuat);
+    for (let k = 0; k < 4; k++) { nrm[k * 3] = _bn.x; nrm[k * 3 + 1] = _bn.y; nrm[k * 3 + 2] = _bn.z; }
+    const old = n.traceMesh.geometry;
+    const ng = new THREE.BufferGeometry();
+    ng.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    ng.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    ng.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+    ng.setIndex([0, 1, 2, 1, 3, 2]);
+    n.traceMesh.geometry = ng;
+    if (old && old.dispose) old.dispose();
   }
-  const starField = new THREE.Group();
-  starField.add(starLayer(4800, 95, 170, 0.9, 0.9, 0.66));    // дальний фон — БОЛЬШЕ мелких далёких звёзд
-  starField.add(starLayer(1300, 55,  92, 1.5, 1.4, 0.9));     // средний
-  starField.add(starLayer(70,   48,  68, 2.3, 2.0, 1.35));    // ближние яркие — МЕНЬШЕ (220→70)
-  world.add(starField);
+  function updateTraces() { for (const n of nodes) rebuildTrace(n); }
 
-  // Мягкое центральное свечение: насыщает центр и плавно гаснет к краям —
-  // заполняет простор на широких экранах, чтобы края «сцены» не были пустыми.
-  // Слоистая цветная туманность (глубокий синий / тил / тёмно-красный намёк на бренд) —
-  // асимметрично, приглушённо: даёт «дымку» и цвет космосу, не перебивая красный акцент.
-  [[0x241a3a, 26, 0.055, -6, 2, -9], [0x0d2a3a, 22, 0.05, 7, -3, -8], [0x3a0c1e, 20, 0.045, 0, 0, -7]]
-    .forEach(([c, s, o, x, y, z]) => {
-      const sp = glowSprite(c, s, o, nebulaTex);
-      sp.position.set(x, y, z);
-      sp.material.rotation = Math.random() * 6.2831853;
-      world.add(sp);
-    });
-
-  // ── 3D-выделение: ЯРКО-красная неоновая линия — тонкое яркое ядро + тугое
-  //    свечение по самой линии (узкая «неон-трубка», без широкого ореола). ──
+  // ── 3D-выделение: ярко-красное неоновое кольцо вокруг наведённого чипа ──
   const selGlow = new THREE.Mesh(
     new THREE.RingGeometry(0.89, 1.07, 96),
     new THREE.MeshBasicMaterial({ color: 0xff0022, transparent: true, opacity: 0,
@@ -811,7 +487,7 @@ export function start(opts) {
     const aspect = window.innerWidth / Math.max(1, window.innerHeight);
     const vFov = camera.fov * Math.PI / 180;
     const t = clampv((aspect - 0.55) / (2.0 - 0.55), 0, 1);
-    const R = lerp(4.8, 6.8, t);                          // портрет — ближе (крупнее), широкий — дальше
+    const R = lerp(4.4, 6.2, t);                          // портрет — ближе (крупнее), широкий — дальше
     const dV = R / (Math.tan(vFov / 2) * 0.9);
     const dH = R / (Math.tan(vFov / 2) * aspect * 0.9);
     return Math.max(dV, dH);
@@ -819,115 +495,25 @@ export function start(opts) {
   function onResize() {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    // updateStyle=true (по умолчанию): Three сам ставит CSS-размер канваса = вьюпорт.
-    // Иначе при zoom-out (devicePixelRatio<1) канвас схлопывается влево — сцена уезжает.
     renderer.setSize(w, h);
     composer.setSize(w, h);
     bloomPass.setSize(w, h);
-    seamMats.forEach(m => m.resolution.set(w, h));
     camera.aspect = w / h; camera.updateProjectionMatrix();
     baseDist = fitDistance();
     layoutHomes();
-    if (ringInst) updateArcs();                         // пересборка дуг + матриц хардвера под вьюпорт
+    updateTraces();                                       // дорожки пересобираются под вьюпорт (на layout, не в кадре)
   }
-
-  // ── Энерго-дуги: построение InstancedMesh-хардвера (1 раз) + (пере)сборка кривых ──
-  // Кривые/TubeGeometry строятся из СТАТИЧНОГО n.target (планеты статичны после раскладки)
-  // на layout/resize, НЕ в кадре. На resize TubeGeometry ПЕРЕСОЗДаётся (старую dispose).
-  function buildArcs() {
-    let total = 0;
-    for (const n of nodes) {
-      n._rings = clampv(Math.round(n.target.length() / 1.8), 2, 4);  // редкие стабилизаторы (2–4 на дугу)
-      total += n._rings;
-    }
-    ringInst      = new THREE.InstancedMesh(ringGeo,      gunmetalMat, total);
-    connectorInst = new THREE.InstancedMesh(connectorGeo, gunmetalMat, nodes.length * 2);
-    [ringInst, connectorInst].forEach((m) => { m.frustumCulled = false; rig.add(m); });
-    updateArcs();
-  }
-
-  // Пересоздать TubeGeometry меша под текущую кривую (старую — dispose).
-  function rebuildTube(n, mesh, radius) {
-    const old = mesh.geometry;
-    mesh.geometry = new THREE.TubeGeometry(n.curve, 44, radius, 8, false);
-    if (old && old.dispose) old.dispose();
-  }
-
-  function updateArcs() {
-    if (!ringInst) return;
-    let ri = 0;                                          // бегущий индекс стабилизатор-колец
-    for (let i = 0; i < nodes.length; i++) {
-      const n = nodes[i];
-      const L = Math.max(0.001, n.target.length());
-      _aDir.copy(n.target).multiplyScalar(1 / L);        // направление ядро→планета (world)
-      _aA.copy(_aDir).multiplyScalar(CORE_R);            // выход из ядра (поверхность)
-      _aB.copy(n.target).addScaledVector(_aDir, -n.pradius);   // вход в планету (поверхность)
-      _aM.copy(_aA).add(_aB).multiplyScalar(0.5);        // середина хорды
-      const chord = _aA.distanceTo(_aB);
-      // bow: перпендикуляр к хорде (своя плоскость на каждую планету) + глубина по знаку nz
-      const upN = Math.abs(_aDir.y) > 0.9 ? _aAltW : _aUpW;
-      _aPerp.copy(_aDir).cross(upN).normalize();
-      _aBow.copy(_aPerp).multiplyScalar(chord * BOW_PERP);
-      _aBow.z += chord * BOW_Z * (n.nz >= 0 ? 1 : -1);   // +nz выгиб К камере, −nz от камеры → разная глубина
-      const maxBow = chord * BOW_MAX;
-      if (_aBow.lengthSq() > maxBow * maxBow) _aBow.setLength(maxBow);   // кламп (узкий портрет не вылезает)
-      _aCtrl.copy(_aM).add(_aBow);
-      // обновляем кривую (мутируем v0/v1/v2) и сбрасываем LUT длины
-      n.curve.v0.copy(_aA); n.curve.v1.copy(_aCtrl); n.curve.v2.copy(_aB);
-      n.curve.updateArcLengths();
-      const arcLen = n.curve.getLength();
-      if (n.shellTex) n.shellTex.repeat.set(1, Math.max(3, Math.round(arcLen / 0.6)));  // окна: ровный шаг по длине
-      // (пере)сборка геометрий кондуита (кожух/энергия/гильза) — старые dispose
-      rebuildTube(n, n.tubeShellMesh,  tubeR);
-      rebuildTube(n, n.tubeEnergyMesh, tubeR * 0.62);
-      rebuildTube(n, n.tubeGlassMesh,  tubeR * 0.72);
-      // Коннекторы-раструбы на обоих концах (вдоль касательной кривой, широким в сферу).
-      n.curve.getTangentAt(0, _aT0); n.curve.getTangentAt(1, _aT1);
-      const hc = tubeR * 4 * CONN_CORE, hp = tubeR * 4 * CONN_PLANET;
-      _aQ.setFromUnitVectors(_aY, _aT0);                 // у ядра: +Y → касательная
-      _aPos.copy(_aA).addScaledVector(_aT0, hc * 0.5);
-      _aScl.setScalar(CONN_CORE);
-      _aMx.compose(_aPos, _aQ, _aScl); connectorInst.setMatrixAt(i * 2, _aMx);
-      _aAxis.copy(_aT1).negate(); _aQ.setFromUnitVectors(_aY, _aAxis);   // у планеты: +Y → −касательная
-      _aPos.copy(_aB).addScaledVector(_aT1, -hp * 0.5);
-      _aScl.setScalar(CONN_PLANET);
-      _aMx.compose(_aPos, _aQ, _aScl); connectorInst.setMatrixAt(i * 2 + 1, _aMx);
-      // Стабилизатор-кольца ВДОЛЬ дуги: ось кольца (Z) = тангенс кривой, точка = getPointAt.
-      const R = n._rings;
-      for (let k = 0; k < R; k++) {
-        const tt = (k + 1) / (R + 1);
-        n.curve.getPointAt(tt, _aPos); n.curve.getTangentAt(tt, _aT0);
-        _aQ.setFromUnitVectors(_aZ, _aT0); _aScl.setScalar(1);
-        _aMx.compose(_aPos, _aQ, _aScl); ringInst.setMatrixAt(ri, _aMx);
-        ri++;
-      }
-    }
-    connectorInst.instanceMatrix.needsUpdate = true;
-    ringInst.instanceMatrix.needsUpdate = true;
-  }
-
-  // Reveal/fade дуги per-planet: opacity на 3 материалах кондуита (+ visible-гейт).
-  function setConduitOpacity(n, k) {
-    const vis = k > 0.004;
-    n.tube.visible = vis;
-    if (!vis) return;
-    n.tubeShellMesh.material.opacity = k;
-    n.tubeEnergyMesh.material.opacity = k;
-    n.tubeGlassMesh.material.opacity = 0.22 * k;
-  }
-
   onResize();
-  buildArcs();
 
-  // ── Параллакс + вращение системы мышью (ЛКМ) + зум колесом ────────────
+  // ── Параллакс + вращение платы мышью (ЛКМ) + зум колесом ──────────────
   let mx = 0, my = 0, tmx = 0, tmy = 0;
   let dragging = false, dragMoved = 0, wasDrag = false, lastDX = 0, lastDY = 0;
-  const userRot = { x: 0, y: 0 }, userRotTo = { x: 0, y: 0 };   // сглаженное / цель
-  let userZoom = 1, userZoomTo = 1;                    // отдаление максимум 1.5 (150%)
+  const userRot = { x: 0, y: 0 }, userRotTo = { x: 0, y: 0 };
+  let userZoom = 1, userZoomTo = 1;
   function onMouse(e) {
     tmx = (e.clientX / window.innerWidth) * 2 - 1;
     tmy = (e.clientY / window.innerHeight) * 2 - 1;
-    if (dragging) {                                     // ЛКМ-перетаскивание → крутим всю систему
+    if (dragging) {                                     // ЛКМ-перетаскивание → крутим всю плату
       const dx = e.clientX - lastDX, dy = e.clientY - lastDY;
       lastDX = e.clientX; lastDY = e.clientY;
       dragMoved += Math.abs(dx) + Math.abs(dy);
@@ -936,7 +522,7 @@ export function start(opts) {
       setHover(null);
       return;
     }
-    pickHover(e);                                       // наведение на планету (только в idle)
+    pickHover(e);
   }
   function onDown(e) {
     if (e.button !== 0 || phase !== 'idle' || focusEntry) return;
@@ -948,47 +534,39 @@ export function start(opts) {
     if (!dragging) return;
     dragging = false; wasDrag = dragMoved > 6; document.body.style.cursor = '';
   }
-  function onWheel(e) {                                 // зум; отдаление не больше 150%
+  function onWheel(e) {
     if (phase !== 'idle' || focusEntry) return;
     if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
     e.preventDefault();
     userZoomTo = Math.max(0.7, Math.min(1.5, userZoomTo + (e.deltaY > 0 ? 0.08 : -0.08)));
   }
 
-  // ── Тач: палец крутит систему (как ЛКМ на ПК), щипок — зум ─────────────
-  // Важно: вертикальный свайп ОТДАЁМ браузеру (скролл страницы — иначе из героя
-  // 86vh не добраться до контента). Ось определяем после небольшого порога:
-  // горизонталь-доминанта → вращение (и наклон по вертикали внутри жеста),
-  // вертикаль-доминанта → скролл. `.planet-hero { touch-action: pan-y }` помогает.
-  let touchMode = null;          // null | 'decide' | 'rotate' | 'scroll' | 'pinch'
+  // ── Тач: палец крутит плату (как ЛКМ), щипок — зум; вертикаль → скролл ──
+  let touchMode = null;
   let tStartX = 0, tStartY = 0, tLastX = 0, tLastY = 0, pinchDist = 0;
   const _tdist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
   const _inHero = t => t && t.target && t.target.closest && t.target.closest('.planet-hero');
 
   function onTouchStart(e) {
     if (phase !== 'idle' || focusEntry) { touchMode = null; return; }
-    if (e.touches.length >= 2) {                        // щипок → зум
+    if (e.touches.length >= 2) {
       if (!_inHero(e)) { touchMode = null; return; }
       touchMode = 'pinch';
       pinchDist = _tdist(e.touches[0], e.touches[1]);
-      dragging = false; wasDrag = true;                 // двупалый жест — не тап
+      dragging = false; wasDrag = true;
       return;
     }
     const t = e.touches[0];
     if (!(t && t.target && t.target.closest && t.target.closest('.planet-hero'))) { touchMode = null; return; }
-    touchMode = 'decide';                               // ещё не знаем: вращение или скролл
+    touchMode = 'decide';
     tStartX = tLastX = t.clientX; tStartY = tLastY = t.clientY;
     dragging = false; dragMoved = 0; wasDrag = false;
   }
-
   function onTouchMove(e) {
     if (phase !== 'idle' || focusEntry || !touchMode) return;
     if (touchMode === 'pinch' && e.touches.length >= 2) {
       const d = _tdist(e.touches[0], e.touches[1]);
-      if (pinchDist > 0) {                              // сведение пальцев → приближение
-        const ratio = d / pinchDist;
-        userZoomTo = Math.max(0.7, Math.min(1.5, userZoomTo / ratio));
-      }
+      if (pinchDist > 0) { const ratio = d / pinchDist; userZoomTo = Math.max(0.7, Math.min(1.5, userZoomTo / ratio)); }
       pinchDist = d; e.preventDefault();
       return;
     }
@@ -996,9 +574,9 @@ export function start(opts) {
     const t = e.touches[0];
     const totX = t.clientX - tStartX, totY = t.clientY - tStartY;
     if (touchMode === 'decide') {
-      if (Math.abs(totX) < 7 && Math.abs(totY) < 7) { return; }   // ждём явного направления
+      if (Math.abs(totX) < 7 && Math.abs(totY) < 7) { return; }
       if (Math.abs(totX) > Math.abs(totY)) { touchMode = 'rotate'; dragging = true; }
-      else { touchMode = 'scroll'; return; }            // вертикаль → браузерный скролл
+      else { touchMode = 'scroll'; return; }
     }
     if (touchMode === 'rotate') {
       const dx = t.clientX - tLastX, dy = t.clientY - tLastY;
@@ -1007,29 +585,26 @@ export function start(opts) {
       userRotTo.y += dx * 0.006;
       userRotTo.x = Math.max(-1.2, Math.min(1.2, userRotTo.x + dy * 0.006));
       setHover(null);
-      e.preventDefault();                               // не даём странице дёргаться по горизонтали
+      e.preventDefault();
     }
   }
-
   function onTouchEnd(e) {
-    if (touchMode === 'rotate') wasDrag = dragMoved > 6;   // был поворот → подавить тап-фокус
+    if (touchMode === 'rotate') wasDrag = dragMoved > 6;
     if (e.touches.length === 0) { touchMode = null; dragging = false; }
     else if (touchMode === 'pinch' && e.touches.length < 2) { touchMode = null; dragging = false; }
   }
 
   // ── Состояние / тайминги ──────────────────────────────────────────────
-  let phase = 'intro';            // 'intro' → 'idle'
+  let phase = 'intro';
   let raf = 0, startT = 0, last = 0, endAt = 0, paused = false;
-  let running = false;                 // мастер стоп-флаг кадра (pause/dispose снимают)
-  let _attached = false;               // интерактив-listeners подцеплены?
-  let _safety = 0;                     // id таймера-страховки интро
-  const _listeners = [];               // [target, type, fn, opts] — снять в pause/dispose
+  let running = false;
+  let _attached = false;
+  let _safety = 0;
+  const _listeners = [];
   let focus = 0, focusTarget = null, focusEntry = null, focusRef = null;
-  let coreSel = false, coreDim = 0;    // Platform выбран (без зума): продукты гаснут, швы ядра пульсируют
-  // focusEntry — гейт ВЗАИМОДЕЙСТВИЯ (сбрасывается рано, чтобы вернуть управление);
-  // focusRef — ВИЗУАЛЬНАЯ ссылка, держится до полного возврата камеры (fp≈0), без рывка в конце.
-  let focusGoal = 0, focusFrom = 0, focusElapsed = 0;   // твин focus по ТАЙМЕРУ (конечная длительность)
-  const fCam = { x: 0, y: 0, z: 0 }, fLook = { x: 0, y: 0, z: 0 };  // сохранённая цель фокуса — НЕ исчезает при сбросе focusRef
+  let coreSel = false, coreDim = 0;
+  let focusGoal = 0, focusFrom = 0, focusElapsed = 0;
+  const fCam = { x: 0, y: 0, z: 0 }, fLook = { x: 0, y: 0, z: 0 };
 
   const IGNITE = 1000, FIRST = 850, STAGGER = 230, PULSE_DUR = 720;
   const END = FIRST + KEYS.length * STAGGER + PULSE_DUR + 520;
@@ -1041,7 +616,7 @@ export function start(opts) {
     phase = 'idle';
     revealAllCards();
     if (veil) veil.classList.add('lift');
-    if (canvas) canvas.classList.add('bg');            // уходим в задний план (z-index 0)
+    if (canvas) canvas.classList.add('bg');
     document.body.classList.remove('intro-lock');
     document.body.classList.add('intro-done');
     if (skip) skip.removeEventListener('click', skipIntro);
@@ -1050,25 +625,23 @@ export function start(opts) {
     if (bar) bar.removeEventListener('click', skipIntro, true);
   }
   function skipIntro() { if (phase === 'intro') enterIdle(); }
-  function onKey(e) {
-    if (e.key !== 'Escape') return;
-    skipIntro();                                         // Escape: пропустить интро (карточку закрывает сам AppDetail)
-  }
-  // Клик по планете → полная карточка-страница приложения (общий модуль AppDetail).
+  function onKey(e) { if (e.key !== 'Escape') return; skipIntro(); }
+
+  // Клик по чипу/CPU → полная карточка-страница приложения (общий модуль AppDetail).
   function onClick(e) {
     if (phase !== 'idle') return;
-    if (wasDrag) { wasDrag = false; return; }          // это было вращение, а не клик
+    if (wasDrag) { wasDrag = false; return; }
     if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) return;
     const picked = pickAt(e.clientX, e.clientY);
     if (picked) {
-      appView = true;                                  // панель открыта
-      if (picked === coreEntry) { coreSel = true; }    // ядро: без зума, но продукты гаснут + швы пульсируют
-      else { focusTarget = picked; coreSel = false; }  // продукт: зум + пульс («как было»)
+      appView = true;
+      if (picked === coreEntry) { coreSel = true; }    // CPU: без зума, продукты гаснут + рамка ядра пульсирует
+      else { focusTarget = picked; coreSel = false; }  // чип: зум + подсветка
       if (window.AppDetail && window.AppDetail.open) window.AppDetail.open(picked.key);
     }
   }
 
-  // ── Наведение на планету: красная обводка + инфо-карточка ─────────────
+  // ── Наведение: инфо-карточка + красная обводка ────────────────────────
   const _v3 = new THREE.Vector3();
   const cardEl = document.getElementById('planet-card');
   const pc = cardEl ? {
@@ -1087,9 +660,8 @@ export function start(opts) {
     pc.desc.textContent = d.desc; pc.desc.style.display = d.desc ? '' : 'none';
     pc.badge.textContent = d.badge; pc.badge.className = 'pc-badge ' + (d.beta ? 'beta' : d.live ? 'live' : 'soon');
     pc.badge.style.display = d.badge ? '' : 'none';
-    if (pc.cta) pc.cta.style.display = 'none';     // запуск убран — всё через лаунчер
+    if (pc.cta) pc.cta.style.display = 'none';
   }
-
   function setHover(entry) {
     if (hovered === entry) return;
     hovered = entry;
@@ -1103,14 +675,16 @@ export function start(opts) {
     }
   }
 
-  // Экранная проекция планеты: центр (cx,cy) и радиус в пикселях (pr).
+  // Экранная проекция чипа/CPU: центр (cx,cy) и pick-радиус в пикселях (pr).
+  // Pick-радиус ОБОБЩЁН на пер-entry bounding sphere (entry.pickR) — у боксов нет
+  // geometry.parameters.radius, поэтому ховер/клик работают и для CPU, и для чипов.
   const _vc = new THREE.Vector3(), _ve = new THREE.Vector3(), _vr = new THREE.Vector3();
-  function projectPlanet(entry) {
+  function projectEntry(entry) {
     entry.grp.getWorldPosition(_vc);
-    const r = (entry.mesh.geometry.parameters.radius || 0.5) * entry.grp.scale.x;
-    _vr.setFromMatrixColumn(camera.matrixWorld, 0);      // правый вектор камеры
+    const r = (entry.pickR || 0.6) * entry.grp.scale.x;
+    _vr.setFromMatrixColumn(camera.matrixWorld, 0);
     _ve.copy(_vc).addScaledVector(_vr, r);
-    const behind = _vc.z > camera.position.z;            // планета за камерой → пропустить
+    const behind = _vc.z > camera.position.z;
     _vc.project(camera); _ve.project(camera);
     const cx = (_vc.x * 0.5 + 0.5) * window.innerWidth;
     const cy = (-_vc.y * 0.5 + 0.5) * window.innerHeight;
@@ -1118,27 +692,21 @@ export function start(opts) {
     const ey = (-_ve.y * 0.5 + 0.5) * window.innerHeight;
     return { cx, cy, pr: Math.hypot(ex - cx, ey - cy), behind };
   }
-
-  // Наведение: выбираем планету, к ЦЕНТРУ которой курсор ближе всего (в пределах радиуса).
-  // Чистый 2D-выбор по экрану — кольцо всегда точно совпадает с планетой, без путаницы глубины.
-  // Планета под точкой экрана (ближайшая к центру в пределах радиуса).
   function pickAt(px, py) {
     let best = null, bestD = Infinity;
     for (let i = 0; i < hoverables.length; i++) {
-      const s = projectPlanet(hoverables[i]);
+      const s = projectEntry(hoverables[i]);
       if (s.behind) continue;
       const d = Math.hypot(px - s.cx, py - s.cy);
       if (d <= s.pr * 1.55 && d < bestD) { bestD = d; best = hoverables[i]; }
     }
     return best;
   }
-
   function pickHover(e) {
-    if (phase !== 'idle' || focusEntry) { setHover(null); return; }   // в фокусе ховер выключен
+    if (phase !== 'idle' || focusEntry) { setHover(null); return; }
     if (!(e.target && e.target.closest && e.target.closest('.planet-hero'))) { setHover(null); return; }
     setHover(pickAt(e.clientX, e.clientY));
   }
-
   function positionCard(entry) {
     if (!cardEl) return;
     entry.grp.getWorldPosition(_v3); _v3.project(camera);
@@ -1159,7 +727,6 @@ export function start(opts) {
     const tsec = t / 1000;
 
     // Камера: долли только на интро, дальше — стабильно.
-    // демпфирование пользовательского вращения/зума → ровное движение без рывков
     const uk = Math.min(1, dt * 12);
     userRot.x += (userRotTo.x - userRot.x) * uk;
     userRot.y += (userRotTo.y - userRot.y) * uk;
@@ -1169,34 +736,28 @@ export function start(opts) {
     mx += (tmx - mx) * Math.min(1, dt * 3.0);
     my += (tmy - my) * Math.min(1, dt * 3.0);
 
-    // Фокус на планете (клик): затухание вращения/параллакса + наезд камеры к планете.
-    // focus тянем по ТАЙМЕРУ (easeInOut) → конечная длительность и НУЛЕВАЯ скорость на обоих
-    // концах. Прежнее асимптотическое затухание давало бесконечный «хвост»: камера ползла
-    // последние проценты ~секунду и будто резко замирала — это и читалось как рывок в конце.
+    // Фокус на чипе (клик): затухание вращения/параллакса + наезд камеры.
     const fGoal = focusTarget ? 1 : 0;
     if (fGoal !== focusGoal) { focusFrom = focus; focusElapsed = 0; focusGoal = fGoal; }
     focusElapsed += dt;
-    const fk  = clampv(focusElapsed / (fGoal ? 0.6 : 0.78), 0, 1);                 // вход 0.6 c, возврат 0.78 c
-    const fke = fk < 0.5 ? 4 * fk * fk * fk : 1 - Math.pow(-2 * fk + 2, 3) / 2;     // easeInOut: мягкий старт и мягкая посадка
+    const fk  = clampv(focusElapsed / (fGoal ? 0.6 : 0.78), 0, 1);
+    const fke = fk < 0.5 ? 4 * fk * fk * fk : 1 - Math.pow(-2 * fk + 2, 3) / 2;
     focus = lerp(focusFrom, fGoal, fke);
     if (focusTarget) { focusEntry = focusTarget; focusRef = focusTarget; }
     else {
-      if (focus < 0.01)    focusEntry = null;  // управление снова доступно (камера почти дома)
-      if (focus < 0.0001)  focusRef   = null;  // визуальную ссылку держим до самого нуля
+      if (focus < 0.01)    focusEntry = null;
+      if (focus < 0.0001)  focusRef   = null;
     }
     const fp = ease(clampv(focus, 0, 1));
     const par = 1 - fp;
-    const prx = dragging ? 0 : 1;                       // во время ЛКМ-вращения параллакс выкл
+    const prx = dragging ? 0 : 1;
     world.rotation.y = (userRot.y + mx * 0.16 * prx) * par;
     world.rotation.x = (userRot.x + my * 0.10 * prx) * par;
 
-    if (focusRef) {                                    // обновляем сохранённую цель, пока фокус «жив»
+    if (focusRef) {
       const H = focusRef.home;
-      const r = (focusRef.mesh.geometry.parameters.radius || 0.5) * focusRef.grp.scale.x;
+      const r = (focusRef.pickR || 0.6) * focusRef.grp.scale.x;
       const gap = Math.max(3.0, r * 5.5);
-      // Открыт раздел-панель → уводим планету из-под неё: широкий экран (панель справа)
-      // → планета влево; узкий (нижний лист) → планета вверх. Камера смотрит в смещённую
-      // точку, поэтому планета уезжает к краю и не перекрывается панелью.
       let offX = 0, offY = 0;
       if (appView) {
         const halfH = gap * Math.tan((camera.fov * Math.PI / 180) / 2);
@@ -1206,108 +767,71 @@ export function start(opts) {
       fCam.x = H.x + offX; fCam.y = H.y + offY; fCam.z = H.z + gap;
       fLook.x = H.x + offX; fLook.y = H.y + offY; fLook.z = H.z;
     }
-    // Цель НЕ обнуляется при сбросе focusRef → камера доезжает до дефолта без разрыва
-    // позиции/скорости: fp плавно стремится к 0, цель остаётся прежней (при fp≈0 неважна).
     camera.position.set(lerp(0, fCam.x, fp), lerp(0, fCam.y, fp), lerp(dist, fCam.z, fp));
     camera.lookAt(lerp(0, fLook.x, fp), lerp(0, fLook.y, fp), lerp(0, fLook.z, fp));
 
-    // Ядро: только зажигание на интро (ig) + реакции на фокус/выбор. БЕЗ вечного
-    // пульса/самовращения — Platform статична (выглядела неестественно).
+    // CPU-ядро: зажигание на интро (ig) + реакции на фокус/выбор Platform.
     const ig = phase === 'intro' ? ease(clamp01((t - 150) / IGNITE)) : 1;
     const coreFocusK = (focusRef && focusRef !== coreEntry) ? Math.max(0, 1 - fp) : 1;
-    coreGroup.scale.setScalar((0.4 + 0.6 * ig) * coreFocusK * (1 + coreDim * 0.12));
-    coreInner.material.emissiveIntensity = ig * 0.78;
-    coreHalo.material.opacity = ig * 0.6;
-    coreHalo.scale.setScalar(15 * (0.5 + 0.5 * ig));
-    corePoint.intensity = ig * 2.6;
-    coreDim += ((coreSel ? 1 : 0) - coreDim) * Math.min(1, dt * 5);   // Platform выбран → продукты гаснут
-    { const m = coreSeams.material;                      // швы ядра пульсируют при фокусе ИЛИ выборе Platform
+    coreGroup.scale.setScalar((0.55 + 0.45 * ig) * coreFocusK * (1 + coreDim * 0.1));
+    coreInner.material.emissiveIntensity = ig * 1.35;   // горячий хедспредер CPU (ярко → bloom)
+    coreHalo.material.opacity = ig * 0.7;
+    coreHalo.scale.setScalar(3.4 * (0.6 + 0.4 * ig));
+    corePoint.intensity = ig * 2.8;
+    coreDim += ((coreSel ? 1 : 0) - coreDim) * Math.min(1, dt * 5);
+    { const m = coreSeams.material;
       const tgt = (focusEntry === coreEntry || coreSel) ? (0.5 + 0.5 * Math.sin(tsec * 4.5)) : 0;
       m.opacity += (tgt - m.opacity) * Math.min(1, dt * 7); coreSeams.visible = m.opacity > 0.01; }
 
     if (phase === 'intro' && t > 950 && veil) veil.classList.add('lift');
 
-    // Планеты: орбита + самовращение; на интро — нити/импульсы/раскрытие.
+    // Чипы: раскрытие на интро + ток по дорожкам; статичны (без дрейфа).
+    const cpu = coreEntry.home;
     for (let i = 0; i < nodes.length; i++) {
       const n = nodes[i];
-      n.home.lerp(n.target, Math.min(1, dt * 2.6));      // плавная подстройка под экран
-      const p = tmp.copy(n.home);                        // планета стоит на месте (без дрейфа)
-      n.grp.position.copy(p);
-      // Энерго-дуга — СТАТИЧНАЯ геометрия (построена в updateArcs из n.target в world-
-      // координатах), в кадре НЕ трансформируется. Reveal/fade — через opacity (ниже).
-      // Планеты статичны — самовращение убрано (выглядело неестественно).
-
-      // Швы куба: зажигаются и пульсируют при фокусе (клике) на планете.
-      // Швы куба: зажигаются и пульсируют только при приближении (фокус/клик).
-      {
-        const m = n.seams.material;
-        const tgt = (focusEntry === n) ? (0.5 + 0.5 * Math.sin(tsec * 4.5)) : 0;
-        m.opacity += (tgt - m.opacity) * Math.min(1, dt * 7);
-        n.seams.visible = m.opacity > 0.01;
-      }
+      n.home.lerp(n.target, Math.min(1, dt * 2.6));
+      const p = tmp.copy(n.home);
+      n.grp.position.copy(p);                            // позиция; ориентация=boardQuat (задана на build)
 
       if (phase === 'intro') {
         const tStart = FIRST + i * STAGGER;
         const k = clamp01((t - tStart) / PULSE_DUR);
-        n.line.material.opacity = (k > 0 ? 0.26 : 0) * (0.6 + 0.4 * Math.sin(tsec * 3 + i));
+        n.line.material.opacity = (k > 0 ? 0.3 : 0) * (0.6 + 0.4 * Math.sin(tsec * 3 + i));
         const lp = n.line.geometry.attributes.position.array;
-        lp[0] = 0; lp[1] = 0; lp[2] = 0; lp[3] = p.x; lp[4] = p.y; lp[5] = p.z;
+        lp[0] = cpu.x; lp[1] = cpu.y; lp[2] = cpu.z; lp[3] = p.x; lp[4] = p.y; lp[5] = p.z;
         n.line.geometry.attributes.position.needsUpdate = true;
 
-        if (k > 0 && k < 1) {
+        if (k > 0 && k < 1) {                            // искра из CPU к чипу
           const e = ease(k);
-          n.pulse.position.set(p.x * e, p.y * e, p.z * e);
+          n.pulse.position.set(lerp(cpu.x, p.x, e), lerp(cpu.y, p.y, e), lerp(cpu.z, p.z, e));
           n.pulse.material.opacity = Math.sin(k * Math.PI) * 0.95;
           n.pulse.scale.setScalar(1.0 + Math.sin(k * Math.PI) * 0.8);
         } else { n.pulse.material.opacity = 0; }
 
         if (k >= 1 && !n.revealed) { n.revealed = true; revealKey(n.key); if (i === 0) revealCore(); }
         const grow = clamp01((t - (tStart + PULSE_DUR - 120)) / 360);
-        n.grp.scale.setScalar(ease(grow));
-        setConduitOpacity(n, ease(grow));                // дуга «проявляется» с планетой
-        n.halo.material.opacity = ease(grow) * 0.85;
+        const g = ease(grow);
+        n.grp.scale.setScalar(g);
+        n.traceMesh.visible = g > 0.004; if (n.traceMesh.visible) n.traceMesh.material.opacity = g;
+        n.halo.material.opacity = g * 0.6;
       } else {
         const vis = (focusRef && n !== focusRef ? Math.max(0, 1 - fp) : 1) * (1 - coreDim);
         n.grp.scale.setScalar(vis);
-        setConduitOpacity(n, vis * (1 - fp));            // дуга гаснет с планетой и на зуме
-        n.halo.material.opacity = 0.58;                  // статичный ореол (без «дыхания»/вращения)
-        n.line.material.opacity = 0;                     // прямую радиальную линию прячем (дуга = связь)
+        const tv = vis * (1 - fp);
+        n.traceMesh.visible = tv > 0.004; if (n.traceMesh.visible) n.traceMesh.material.opacity = tv;
+        n.halo.material.opacity = 0.5 * vis;
+        n.line.material.opacity = 0;
       }
     }
 
-    // Хардвер дуг (кольца+раструбы): общий fade — intro-reveal в финале интро + гаснет
-    // на фокусе/выборе ядра. Дёшево: одна opacity на общий gunmetal.
-    if (ringInst) {
-      const rb = phase === 'intro' ? clamp01((t - (END - 1400)) / 1400) : 1;
-      const rigVis = rb * (1 - fp) * (1 - coreDim);
-      rig.visible = rigVis > 0.012;
-      if (rig.visible) gunmetalMat.opacity = rigVis;
-    }
+    energyTex.offset.y = (energyTex.offset.y - dt * 0.5) % 1;   // бег тока по дорожкам наружу
 
-    starField.rotation.y += dt * 0.003;                 // медленный дрейф неба
-    starMat.uniforms.uTime.value = tsec;                // мерцание звёзд
-    energyTex.offset.y = (energyTex.offset.y - dt * 0.5) % 1;   // бег энергии по трубам к планетам
-
-    // Скин-схема: у наведённой планеты «просыпается» неоновая электросхема (волной),
-    // крутится вместе с планетой; у остальных — гаснет.
-    for (let h = 0; h < hoverables.length; h++) {
-      const ent = hoverables[h], c = ent.circuit;
-      const tgt = (ent === hovered && phase === 'idle') ? 1 : 0;
-      c.prog += (tgt - c.prog) * Math.min(1, dt * 5);
-      c.mesh.visible = c.prog > 0.01;
-      if (c.mesh.visible) {
-        c.mat.uniforms.uProg.value = c.prog;
-        c.mat.uniforms.uTime.value = tsec;
-      }
-    }
-
-    // 3D-кольцо выделения: ставим в центр наведённой планеты, лицом к камере,
-    // масштаб = радиус планеты → совпадение идеальное (рисуется тем же кадром).
+    // 3D-кольцо выделения: в центр наведённого чипа, лицом к камере (pick-радиус).
     if (hovered && phase === 'idle') {
       hovered.grp.getWorldPosition(_vc);
       selRing.position.copy(_vc);
       selRing.lookAt(camera.position);
-      selRing.scale.setScalar(((hovered.mesh.geometry.parameters.radius || 0.5) * hovered.grp.scale.x) * 1.06);
+      selRing.scale.setScalar(((hovered.pickR || 0.6) * hovered.grp.scale.x) * 1.12);
       selRing.visible = true;
       selRing.material.opacity = Math.min(1, selRing.material.opacity + dt * 8);
       selGlow.material.opacity = selRing.material.opacity * 0.55;
@@ -1319,14 +843,13 @@ export function start(opts) {
 
     composer.render();
 
-    // Карточка следует за планетой (после render — матрицы свежие).
     if (hovered && phase === 'idle') positionCard(hovered);
 
     if (phase === 'intro') {
       if (t >= END && !endAt) endAt = now;
       if (endAt && now - endAt > 250) { enterIdle(); }
     }
-    if (running) raf = requestAnimationFrame(frame);    // стоп-флаг: pause/dispose не пере-армят кадр
+    if (running) raf = requestAnimationFrame(frame);
   }
 
   // ── Пауза при скрытой вкладке ─────────────────────────────────────────
@@ -1335,14 +858,13 @@ export function start(opts) {
     else if (paused) { paused = false; last = 0; if (running) raf = requestAnimationFrame(frame); }
   }
 
-  // Открыт раздел приложения (#app/<key>) → фокус-зум на соответствующую планету
-  // (пульс швов) + смещение из-под панели; уход с маршрута → камера возвращается домой.
+  // Открыт раздел приложения (#app/<key>) → фокус-зум на чип / выбор CPU.
   function onHashView() {
     const m = (location.hash || '').match(/^#app\/(.+)$/);
     appView = !!m;
-    if (!m) { focusTarget = null; coreSel = false; return; }   // ушли из раздела → всё домой
+    if (!m) { focusTarget = null; coreSel = false; return; }
     let key; try { key = decodeURIComponent(m[1]); } catch (e) { key = m[1]; }
-    if (key === 'platform') { coreSel = true; }                 // ядро — без зума, со своей анимацией
+    if (key === 'platform') { coreSel = true; }
     else if (!focusTarget) { focusTarget = hoverables.find(h => h.key === key) || null; coreSel = false; }
   }
 
@@ -1360,7 +882,7 @@ export function start(opts) {
     on(window, 'mouseup', onUp);
     on(window, 'wheel', onWheel, { passive: false });
     on(window, 'touchstart', onTouchStart, { passive: true });
-    on(window, 'touchmove', onTouchMove, { passive: false });   // нужен preventDefault при вращении
+    on(window, 'touchmove', onTouchMove, { passive: false });
     on(window, 'touchend', onTouchEnd, { passive: true });
     on(window, 'touchcancel', onTouchEnd, { passive: true });
     on(window, 'click', onClick);
@@ -1370,7 +892,7 @@ export function start(opts) {
     const bar = document.querySelector('.topbar');
     if (bar) on(bar, 'click', skipIntro, true);
     on(document, 'keydown', onKey);
-    onHashView();                                      // синхронизировать состояние при подцепке
+    onHashView();
   }
   function detach() {
     if (!_attached) return;
@@ -1398,8 +920,8 @@ export function start(opts) {
         else if (mat) { addTex(mat); if (mat.dispose) mat.dispose(); }
       });
     } catch (e) {}
-    if (scene.environment) texSet.add(scene.environment);     // PMREM-окружение
-    [glowTex, nebulaTex, circuitTex, energyTex, glassTex, tubeNormalTex].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
+    if (scene.environment) texSet.add(scene.environment);
+    [glowTex, energyTex, boardTex.map, boardTex.emis].forEach((t) => { if (t) texSet.add(t); });  // общие CanvasTexture
     texSet.forEach((t) => { try { if (t.dispose) t.dispose(); } catch (e) {} });
     try { if (composer.dispose) composer.dispose(); } catch (e) {}
     try { pmrem.dispose(); } catch (e) {}
@@ -1409,19 +931,19 @@ export function start(opts) {
   // ── pause / resume / dispose (замыкания живой сцены) ───────────────────
   function doPause() {
     cancelAnimationFrame(raf); raf = 0;
-    running = false;                                   // стоп-флаг: frame() не пере-армится
+    running = false;
     if (_safety) { clearTimeout(_safety); _safety = 0; }
-    detach();                                          // снять интерактив-listeners
-    document.body.classList.remove('planets-on');      // вернуть 2D-плитки .eco-stage
-    if (canvas) canvas.classList.add('done');          // спрятать фон-канвас
+    detach();
+    document.body.classList.remove('planets-on');
+    if (canvas) canvas.classList.add('done');
   }
   function doResume() {
-    if (running) return true;                          // уже живём
+    if (running) return true;
     document.body.classList.add('planets-on');
     if (canvas) canvas.classList.remove('done');
     attach();
-    onResize();                                        // вьюпорт мог измениться на паузе
-    running = true; paused = false; last = 0;          // last=0 — сброс dt (как в onVisibility)
+    onResize();
+    running = true; paused = false; last = 0;
     raf = requestAnimationFrame(frame);
     return true;
   }
@@ -1433,14 +955,13 @@ export function start(opts) {
     _teardownGPU();
     document.body.classList.remove('planets-on');
     if (canvas) canvas.classList.add('done');
-    started = false; _api = null;                      // область start() становится сборимой (GC)
+    started = false; _api = null;
   }
 
   // ── Запуск сцены ──────────────────────────────────────────────────────
   running = true;
   attach();
   raf = requestAnimationFrame(frame);
-  // Страховка: если интро зависло — гарантированно раскрыть контент.
   _safety = setTimeout(() => { if (phase === 'intro') enterIdle(); }, END + 2500);
 
   _api = { pause: doPause, resume: doResume, dispose: doDispose };
